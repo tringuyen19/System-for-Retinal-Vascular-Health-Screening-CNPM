@@ -5,7 +5,6 @@ This project is structured using the Clean Architecture principles, which promot
 ## Directory Structure
 
 - **migrations/**: Contains database migration files.
-- **scripts/**: Contains scripts for running and managing the application, such as `run_postgres.sh` for PostgreSQL.
 - **api/**: Contains the API-related components.
   - **controllers/**: Controllers for handling API requests.
   - **schemas/**: Marshmallow schemas for data validation and serialization.

@@ -3,7 +3,6 @@
 ```bash
     ├── migrations
     ├── scripts
-    │   └── run_postgres.sh
     ├── src
     │   ├── api
     │   │   ├── controllers
@@ -38,14 +37,8 @@
     │   └── logging.py
 ```
 
-## Domain Layer
-
-## Services Layer
-
-## Infrastructure Layer
-
 ## Download source code (CMD)
-    git clone https://github.com/tringuyen19/System-for-Retinal-Vascular-Health-Screening---SP26SE025.git
+    https://github.com/tringuyen19/System-for-Retinal-Vascular-Health-Screening-CNPM.git
 ## Kiểm tra đã cài python đã cài đặt trên máy chưa
     python --version
 ## Run app
@@ -71,7 +64,6 @@
     		python app.py
 
 
-     Truy câp http://localhost:6868/docs
      Truy câp http://localhost:9999/docs
 
 
