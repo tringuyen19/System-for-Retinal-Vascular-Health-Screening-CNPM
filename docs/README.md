@@ -3,7 +3,6 @@
 ```bash
     ├── migrations
     ├── scripts
-    │   └── run_postgres.sh
     ├── src
     │   ├── api
     │   │   ├── controllers
