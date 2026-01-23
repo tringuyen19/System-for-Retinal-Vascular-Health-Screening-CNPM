@@ -38,12 +38,6 @@
     │   └── logging.py
 ```
 
-## Domain Layer
-
-## Services Layer
-
-## Infrastructure Layer
-
 ## Download source code (CMD)
     https://github.com/tringuyen19/System-for-Retinal-Vascular-Health-Screening-CNPM.git
 ## Kiểm tra đã cài python đã cài đặt trên máy chưa
