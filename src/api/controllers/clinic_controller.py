@@ -1,6 +1,13 @@
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
 from infrastructure.repositories.clinic_repository import ClinicRepository
+from infrastructure.repositories.account_repository import AccountRepository
+from infrastructure.repositories.patient_profile_repository import PatientProfileRepository
+from infrastructure.repositories.doctor_profile_repository import DoctorProfileRepository
+from infrastructure.repositories.retinal_image_repository import RetinalImageRepository
+from infrastructure.repositories.ai_result_repository import AiResultRepository
+from infrastructure.repositories.subscription_repository import SubscriptionRepository
+from infrastructure.repositories.medical_report_repository import MedicalReportRepository
 from infrastructure.databases.mssql import session
 from services.clinic_service import ClinicService
 from api.responses import success_response, error_response, not_found_response, validation_error_response
@@ -8,11 +15,27 @@ from api.schemas import ClinicCreateRequestSchema, ClinicUpdateRequestSchema, Cl
 
 clinic_bp = Blueprint('clinic', __name__, url_prefix='/api/clinics')
 
-# Initialize repository (only for service initialization)
+# Initialize repositories
 clinic_repo = ClinicRepository(session)
+account_repo = AccountRepository(session)
+patient_repo = PatientProfileRepository(session)
+doctor_repo = DoctorProfileRepository(session)
+image_repo = RetinalImageRepository(session)
+result_repo = AiResultRepository(session)
+subscription_repo = SubscriptionRepository(session)
+report_repo = MedicalReportRepository(session)
 
-# Initialize SERVICE (Business Logic Layer) ✅
-clinic_service = ClinicService(clinic_repo)
+# Initialize SERVICE with dependency injection ✅
+clinic_service = ClinicService(
+    repository=clinic_repo,
+    account_repository=account_repo,
+    patient_repository=patient_repo,
+    doctor_repository=doctor_repo,
+    image_repository=image_repo,
+    result_repository=result_repo,
+    subscription_repository=subscription_repo,
+    report_repository=report_repo
+)
 
 
 @clinic_bp.route('/health', methods=['GET'])
@@ -270,25 +293,66 @@ def get_pending_clinics():
 @clinic_bp.route('/<int:clinic_id>/verify', methods=['PUT'])
 def verify_clinic(clinic_id):
     """
-    Verify clinic (Admin only)
+    Verify clinic (Admin only) - FR-22 Verification Workflow
+    
+    Workflow: pending → verified
+    Only clinics with 'pending' status can be verified.
     ---
     tags:
       - Clinic
+    consumes:
+      - application/json
+    produces:
+      - application/json
     parameters:
       - name: clinic_id
         in: path
         required: true
         schema:
           type: integer
+           example: 1
+      - in: body
+        name: body
+        required: false
+        schema:
+          type: object
+          properties:
+            admin_notes:
+              type: string
+              example: "All documents verified. License valid."
+              description: Optional notes from admin
     responses:
       200:
         description: Clinic verified successfully
+              schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Clinic verified successfully
+            data:
+              type: object
+              properties:
+                clinic_id:
+                  type: integer
+                clinic_name:
+                  type: string
+                verification_status:
+                  type: string
+                  enum: [verified]
+      400:
+        description: Invalid request (clinic not in pending status)
       404:
         description: Clinic not found
     """
     try:
+        from domain.exceptions import NotFoundException, ValidationException
+        
+        data = request.get_json() or {}
+        admin_notes = data.get('admin_notes')
+
         # Call SERVICE ✅
-        clinic = clinic_service.verify_clinic(clinic_id)
+        clinic = clinic_service.verify_clinic(clinic_id, admin_notes=admin_notes)
         if not clinic:
             return not_found_response('Clinic not found')
         
@@ -297,7 +361,9 @@ def verify_clinic(clinic_id):
             'clinic_name': clinic.clinic_name,
             'verification_status': clinic.verification_status
         }, 'Clinic verified successfully')
-        
+    
+    except NotFoundException as e:
+        return not_found_response(str(e))
     except ValueError as e:
         return error_response(str(e), 400)
     except Exception as e:
@@ -307,25 +373,67 @@ def verify_clinic(clinic_id):
 @clinic_bp.route('/<int:clinic_id>/reject', methods=['PUT'])
 def reject_clinic(clinic_id):
     """
-    Reject clinic verification (Admin only)
+    Reject clinic verification (Admin only) - FR-22 Verification Workflow
+    
+    Workflow: pending → rejected
+    Only clinics with 'pending' status can be rejected.
+    Rejection reason is recommended for audit trail.
     ---
     tags:
       - Clinic
+    consumes:
+      - application/json
+    produces:
+      - application/json
     parameters:
       - name: clinic_id
         in: path
         required: true
         schema:
           type: integer
+          example: 1
+      - in: body
+        name: body
+        required: false
+        schema:
+          type: object
+          properties:
+            admin_notes:
+              type: string
+              example: "Invalid license number or missing required documents"
+              description: Reason for rejection (recommended)
     responses:
       200:
         description: Clinic rejected successfully
+                schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Clinic verification rejected
+            data:
+              type: object
+              properties:
+                clinic_id:
+                  type: integer
+                clinic_name:
+                  type: string
+                verification_status:
+                  type: string
+                  enum: [rejected]
+      400:
+        description: Invalid request (clinic not in pending status)
       404:
         description: Clinic not found
     """
     try:
+        from domain.exceptions import NotFoundException
+        
+        data = request.get_json() or {}
+        rejection_reason = data.get('rejection_reason')
+
         # Call SERVICE ✅
-        clinic = clinic_service.reject_clinic(clinic_id)
+        clinic = clinic_service.reject_clinic(clinic_id, rejection_reason=rejection_reason)
         if not clinic:
             return not_found_response('Clinic not found')
         
@@ -334,7 +442,9 @@ def reject_clinic(clinic_id):
             'clinic_name': clinic.clinic_name,
             'verification_status': clinic.verification_status
         }, 'Clinic verification rejected')
-        
+
+    except NotFoundException as e:
+        return not_found_response(str(e))
     except ValueError as e:
         return error_response(str(e), 400)
     except Exception as e:
@@ -493,3 +603,445 @@ def get_stats():
     except Exception as e:
         return error_response(f'Internal server error: {str(e)}', 500)
 
+
+# ========== PHASE 3: CLINIC FUNCTIONAL REQUIREMENTS ==========
+
+@clinic_bp.route('/<int:clinic_id>/verification-status', methods=['GET'])
+def get_verification_status(clinic_id):
+    """
+    Get clinic verification status (FR-22)
+    ---
+    tags:
+      - Clinic
+    parameters:
+      - name: clinic_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    responses:
+      200:
+        description: Verification status retrieved
+        schema:
+          type: object
+          properties:
+            clinic_id:
+              type: integer
+            verification_status:
+              type: string
+              enum: [pending, verified, rejected]
+      404:
+        description: Clinic not found
+    """
+    try:
+        from domain.exceptions import NotFoundException
+        status = clinic_service.get_verification_status(clinic_id)
+        return success_response({
+            'clinic_id': clinic_id,
+            'verification_status': status
+        })
+    except NotFoundException as e:
+        return not_found_response(str(e))
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@clinic_bp.route('/<int:clinic_id>/members', methods=['GET'])
+def get_clinic_members(clinic_id):
+    """
+    Get all members (doctors and patients) in clinic (FR-23)
+    ---
+    tags:
+      - Clinic
+    parameters:
+      - name: clinic_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          example: 2
+    responses:
+      200:
+        description: Clinic members retrieved
+        schema:
+          type: object
+          properties:
+            clinic_id:
+              type: integer
+              example: 2
+            doctors:
+              type: array
+              items:
+                type: object
+                properties:
+                  account_id:
+                    type: integer
+                    example: 3
+                  doctor_id:
+                    type: integer
+                    example: 2
+                  doctor_name:
+                    type: string
+                    example: "Dr. Tran Thi B"
+                  specialization:
+                    type: string
+                    example: "Ophthalmologist"
+                  license_number:
+                    type: string
+                    example: "DOC-LICENSE-002"
+            patients:
+              type: array
+              items:
+                type: object
+                properties:
+                  account_id:
+                    type: integer
+                    example: 4
+                  patient_id:
+                    type: integer
+                    example: 1
+                  patient_name:
+                    type: string
+                    example: "Nguyen Van Patient 1"
+                  date_of_birth:
+                    type: string
+                    format: date
+                    example: "1980-01-15"
+                  gender:
+                    type: string
+                    example: "Male"
+            total_doctors:
+              type: integer
+              example: 1
+            total_patients:
+              type: integer
+              example: 2
+      400:
+        description: Invalid request
+      404:
+        description: Clinic not found
+      500:
+        description: Internal server error
+    """
+    try:
+        members = clinic_service.get_clinic_members(clinic_id)
+        return success_response(members)
+    except ValueError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@clinic_bp.route('/<int:clinic_id>/risk-aggregation', methods=['GET'])
+def get_clinic_risk_aggregation(clinic_id):
+    """
+    Get aggregated risk data for all patients in clinic (FR-25)
+    ---
+    tags:
+      - Clinic
+    parameters:
+      - name: clinic_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          example: 1
+    responses:
+      200:
+        description: Risk aggregation retrieved
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Success
+            data:
+              type: object
+              properties:
+                clinic_id:
+                  type: integer
+                  example: 1
+                total_patients:
+                  type: integer
+                  example: 10
+                total_analyses:
+                  type: integer
+                  example: 25
+                risk_distribution:
+                  type: object
+                  properties:
+                    low:
+                      type: integer
+                      example: 10
+                    medium:
+                      type: integer
+                      example: 8
+                    high:
+                      type: integer
+                      example: 5
+                    critical:
+                      type: integer
+                      example: 2
+                high_risk_patients_count:
+                  type: integer
+                  example: 7
+                high_risk_patients:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      patient_id:
+                        type: integer
+                        example: 1
+                      patient_name:
+                        type: string
+                        example: "Nguyen Van A"
+                      risk_level:
+                        type: string
+                        example: "high"
+      400:
+        description: Invalid request
+      500:
+        description: Internal server error
+    """
+    try:
+        aggregation = clinic_service.get_clinic_risk_aggregation(clinic_id)
+        return success_response(aggregation)
+    except ValueError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@clinic_bp.route('/<int:clinic_id>/usage', methods=['GET'])
+def get_clinic_usage(clinic_id):
+    """
+    Get clinic usage summary including images and package usage (FR-27)
+    ---
+    tags:
+      - Clinic
+    parameters:
+      - name: clinic_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    responses:
+      200:
+        description: Usage summary retrieved
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Success
+            data:
+              type: object
+              properties:
+                clinic_id:
+                  type: integer
+                  example: 1
+                total_images_uploaded:
+                  type: integer
+                  example: 50
+                total_analyses:
+                  type: integer
+                  example: 45
+                active_subscriptions:
+                  type: integer
+                  example: 2
+                total_credits_allocated:
+                  type: integer
+                  example: 1000
+                remaining_credits:
+                  type: integer
+                  example: 750
+                credits_used:
+                  type: integer
+                  example: 250
+      400:
+        description: Invalid request
+      500:
+        description: Internal server error
+    """
+    try:
+        usage = clinic_service.get_clinic_usage_summary(clinic_id)
+        return success_response(usage)
+    except ValueError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@clinic_bp.route('/<int:clinic_id>/high-risk-alerts', methods=['GET'])
+def get_high_risk_alerts(clinic_id):
+    """
+    Get high-risk patient alerts for clinic (FR-29)
+    ---
+    tags:
+      - Clinic
+    parameters:
+      - name: clinic_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          example: 1
+      - name: risk_level
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [high, critical]
+          default: high
+        description: Risk level to filter
+    responses:
+      200:
+        description: High-risk alerts retrieved
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Success
+            data:
+              type: object
+              properties:
+                clinic_id:
+                  type: integer
+                  example: 1
+                risk_level:
+                  type: string
+                  example: "high"
+                alerts:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      patient_id:
+                        type: integer
+                        example: 1
+                      patient_name:
+                        type: string
+                        example: "Nguyen Van A"
+                      risk_level:
+                        type: string
+                        example: "high"
+                      latest_analysis:
+                        type: object
+                        properties:
+                          risk_level:
+                            type: string
+                            example: "high"
+                          confidence_score:
+                            type: number
+                            format: float
+                            example: 95.5
+                          disease_type:
+                            type: string
+                            example: "diabetic_retinopathy"
+                      alert_timestamp:
+                        type: string
+                        format: date-time
+                        example: "2024-01-15T10:30:00"
+                count:
+                  type: integer
+                  example: 5
+      400:
+        description: Invalid request
+      500:
+        description: Internal server error
+    """
+    try:
+        risk_level = request.args.get('risk_level', 'high')
+        alerts = clinic_service.get_high_risk_alerts(clinic_id, risk_level)
+        return success_response({
+            'clinic_id': clinic_id,
+            'risk_level': risk_level,
+            'alerts': alerts,
+            'count': len(alerts)
+        })
+    except ValueError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@clinic_bp.route('/<int:clinic_id>/abnormal-trends', methods=['GET'])
+def detect_abnormal_trends(clinic_id):
+    """
+    Detect abnormal trends in clinic patient data (FR-29)
+    ---
+    tags:
+      - Clinic
+    parameters:
+      - name: clinic_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          example: 1
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 30
+        description: Number of days to analyze
+    responses:
+      200:
+        description: Abnormal trends detected
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Success
+            data:
+              type: object
+              properties:
+                clinic_id:
+                  type: integer
+                  example: 1
+                period_days:
+                  type: integer
+                  example: 30
+                total_patients_analyzed:
+                  type: integer
+                  example: 10
+                abnormal_trends_detected:
+                  type: boolean
+                  example: true
+                abnormal_trends:
+                  type: object
+                  properties:
+                    risk_increases:
+                      type: array
+                      items:
+                        type: object
+                    sudden_spikes:
+                      type: array
+                      items:
+                        type: object
+                    total_abnormal_cases:
+                      type: integer
+                summary:
+                  type: object
+                  properties:
+                    risk_increases_count:
+                      type: integer
+                    sudden_spikes_count:
+                      type: integer
+      400:
+        description: Invalid request
+      500:
+        description: Internal server error
+    """
+    try:
+        days = request.args.get('days', type=int, default=30)
+        trends = clinic_service.detect_abnormal_trends(clinic_id, days)
+        return success_response(trends)
+    except ValueError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)

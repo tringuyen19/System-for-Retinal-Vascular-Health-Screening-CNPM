@@ -2,6 +2,8 @@ from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
 from infrastructure.repositories.ai_result_repository import AiResultRepository
 from infrastructure.repositories.ai_analysis_repository import AiAnalysisRepository
+from infrastructure.repositories.notification_repository import NotificationRepository
+from infrastructure.repositories.retinal_image_repository import RetinalImageRepository
 from infrastructure.databases.mssql import session
 from services.ai_result_service import AiResultService
 from services.ai_analysis_service import AiAnalysisService
@@ -10,12 +12,19 @@ from api.schemas import AiResultCreateRequestSchema, AiResultUpdateRequestSchema
 
 ai_result_bp = Blueprint('ai_result', __name__, url_prefix='/api/ai-results')
 
-# Initialize repositories (only for service initialization)
+# Initialize repositories
 result_repo = AiResultRepository(session)
 analysis_repo = AiAnalysisRepository(session)
+notification_repo = NotificationRepository(session)
+image_repo = RetinalImageRepository(session)
 
-# Initialize SERVICES (Business Logic Layer) ✅
-result_service = AiResultService(result_repo)
+# Initialize SERVICES with dependency injection ✅
+result_service = AiResultService(
+    repository=result_repo,
+    notification_repository=notification_repo,
+    analysis_repository=analysis_repo,
+    image_repository=image_repo
+)
 analysis_service = AiAnalysisService(analysis_repo)
 
 

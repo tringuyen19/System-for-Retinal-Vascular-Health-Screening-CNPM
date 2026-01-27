@@ -61,6 +61,35 @@ class NotificationService:
             content=content
         )
     
+    def send_high_risk_alert(self, account_id: int, patient_id: int, risk_level: str, 
+                            disease_type: str, confidence_score: float) -> Notification:
+        """
+        Auto-trigger high-risk alert notification (FR-29)
+        
+        Args:
+            account_id: Account ID (clinic manager or doctor)
+            patient_id: Patient ID
+            risk_level: Risk level (high or critical)
+            disease_type: Type of disease detected
+            confidence_score: Confidence score
+            
+        Returns:
+            Notification: Created notification domain model
+        """
+        if risk_level.lower() in ['high', 'critical']:
+            content = (
+                f"⚠️ HIGH RISK ALERT: Patient ID {patient_id} has been detected with "
+                f"{risk_level.upper()} risk level. Disease: {disease_type}. "
+                f"Confidence: {confidence_score:.1f}%. Immediate attention required."
+            )
+            
+            return self.send_notification(
+                account_id=account_id,
+                notification_type='high_risk_alert',
+                content=content
+            )
+        return None
+
     def broadcast_notification(self, account_ids: List[int], notification_type: str, 
                               content: str) -> List[Notification]:
         """Broadcast notification to multiple users"""

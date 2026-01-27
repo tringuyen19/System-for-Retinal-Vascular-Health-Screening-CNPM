@@ -196,3 +196,13 @@ class AccountRepository(IAccountRepository):
             raise ValueError(f'Error checking email existence: {str(e)}')
         finally:
             self.session.close()
+    
+    def get_by_clinic(self, clinic_id: int) -> List[Account]:
+        """Get all accounts in a clinic"""
+        try:
+            account_models = self.session.query(AccountModel).filter_by(clinic_id=clinic_id).all()
+            return [self._to_domain(model) for model in account_models]
+        except Exception as e:
+            raise ValueError(f'Error getting accounts by clinic: {str(e)}')
+        finally:
+            self.session.close()
