@@ -124,18 +124,33 @@ class RetinalImageService:
             'error': self.repository.count_by_status('error')
         }
     
-    def upload_bulk_images(self, images_data: List[dict]) -> Dict[str, Any]:
-        """Upload multiple images in bulk"""
+    def upload_bulk_images(self, images_data: List[dict], batch_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Upload multiple images in bulk with batch tracking (FR-24)
+        
+        Args:
+            images_data: List of image data dictionaries
+            batch_id: Optional batch ID for tracking (auto-generated if not provided)
+            
+        Returns:
+            dict: Upload results with batch_id for tracking
+        """
+        import uuid
+        
+        # Generate batch_id if not provided
+        if not batch_id:
+            batch_id = f"batch_{uuid.uuid4().hex[:8]}_{int(datetime.now().timestamp())}"
+        
         uploaded_images = []
         errors = []
         
         for img_data in images_data:
             try:
                 # Validate image type
-                valid_types = ['fundus', 'oct', 'angiography']
+                valid_types = ['fundus', 'oct', 'angiography', 'fluorescein']
                 if img_data.get('image_type') not in valid_types:
                     errors.append({
-                        'index': len(uploaded_images) + len(errors),
+                        'image_url': img_data.get('image_url', 'unknown'),
                         'error': f"Invalid image type: {img_data.get('image_type')}"
                     })
                     continue
@@ -144,7 +159,7 @@ class RetinalImageService:
                 valid_sides = ['left', 'right', 'both']
                 if img_data.get('eye_side') not in valid_sides:
                     errors.append({
-                        'index': len(uploaded_images) + len(errors),
+                        'image_url': img_data.get('image_url', 'unknown'),
                         'error': f"Invalid eye side: {img_data.get('eye_side')}"
                     })
                     continue
@@ -165,19 +180,22 @@ class RetinalImageService:
                     uploaded_images.append(image)
                 else:
                     errors.append({
-                        'index': len(uploaded_images) + len(errors),
+                        'image_url': img_data.get('image_url', 'unknown'),
                         'error': 'Failed to upload image'
                     })
             except Exception as e:
                 errors.append({
-                    'index': len(uploaded_images) + len(errors),
+                    'image_url': img_data.get('image_url', 'unknown'),
                     'error': str(e)
                 })
         
         return {
+            'batch_id': batch_id,
             'uploaded': uploaded_images,
             'errors': errors,
             'total': len(images_data),
             'success_count': len(uploaded_images),
-            'error_count': len(errors)
+            'error_count': len(errors),
+            'batch_status': 'completed' if len(errors) == 0 else 'partial' if len(uploaded_images) > 0 else 'failed',
+            'created_at': datetime.now().isoformat()
         }

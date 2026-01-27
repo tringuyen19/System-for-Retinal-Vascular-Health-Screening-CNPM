@@ -143,7 +143,7 @@ def upload_image():
 @retinal_image_bp.route('/bulk', methods=['POST'])
 def upload_bulk_images():
     """
-    Upload multiple retinal images in bulk
+    Upload multiple retinal images in bulk with batch tracking (FR-24)
     ---
     tags:
       - Retinal Images
@@ -238,6 +238,15 @@ def upload_bulk_images():
                         type: string
                       error:
                         type: string
+               batch_id:
+                  type: string
+                  example: "batch_abc123_1234567890"
+                  description: Batch ID for tracking this upload
+                batch_status:
+                  type: string
+                  enum: [completed, partial, failed]
+                  example: "completed"
+                  description: Status of the batch upload
                 total:
                   type: integer
                   example: 3
@@ -247,6 +256,10 @@ def upload_bulk_images():
                 error_count:
                   type: integer
                   example: 0
+                created_at:
+                  type: string
+                  format: date-time
+                  example: "2024-01-15T10:30:00"
       400:
         description: Invalid input
         schema:
@@ -318,8 +331,11 @@ def upload_bulk_images():
         # If some images have errors but some are valid, proceed with valid ones
         # (Errors will be included in the final response from service)
         
-        # Upload bulk images (only valid ones)
-        result = image_service.upload_bulk_images(images_data)
+       # Get optional batch_id from request
+        batch_id = data.get('batch_id')
+        
+        # Upload bulk images (only valid ones) with batch tracking
+        result = image_service.upload_bulk_images(images_data, batch_id=batch_id)
         
         # Merge validation errors from controller with service errors
         all_errors = validation_errors.copy()
@@ -340,14 +356,17 @@ def upload_bulk_images():
         total_images = len(data['images'])
         
         response_data = {
+            'batch_id': result['batch_id'],
+            'batch_status': result['batch_status'],
             'uploaded': serialized_uploaded,
             'errors': all_errors,
             'total': total_images,
             'success_count': total_success_count,
-            'error_count': total_error_count
+            'error_count': total_error_count,
+            'created_at': result['created_at']
         }
         
-        message = f"Bulk upload completed: {total_success_count} successful, {total_error_count} failed"
+        message = f"Bulk upload completed: {total_success_count} successful, {total_error_count} failed. Batch ID: {result['batch_id']}"
         return success_response(response_data, message, 201)
         
     except ValidationError as e:

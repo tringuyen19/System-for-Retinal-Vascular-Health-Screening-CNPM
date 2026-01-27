@@ -302,6 +302,17 @@ class ClinicService:
         # Get all images uploaded by clinic
         images = self.image_repository.get_by_clinic(clinic_id) if hasattr(self.image_repository, 'get_by_clinic') else []
         
+        # Get analyses count (more accurate than checking image status)
+        from infrastructure.repositories.ai_analysis_repository import AiAnalysisRepository
+        from infrastructure.databases.mssql import session
+        analysis_repo = AiAnalysisRepository(session)
+        
+        total_analyses = 0
+        for image in images:
+            analysis = analysis_repo.get_by_image_id(image.image_id)
+            if analysis:
+                total_analyses += 1
+        
         # Get clinic subscriptions (via accounts)
         total_credits = 0
         remaining_credits = 0
@@ -315,17 +326,23 @@ class ClinicService:
                     for sub in subscriptions:
                         if sub.status == 'active':
                             active_subscriptions += 1
-                            total_credits += sub.remaining_credits
+                            # Use remaining_credits as total for now (simplified)
+                            # In production, should track initial credits separately
                             remaining_credits += sub.remaining_credits
+                            # Estimate total credits (assuming remaining is accurate)
+                            total_credits += sub.remaining_credits  # Simplified
+        
+        credits_used = max(0, total_credits - remaining_credits) if total_credits > 0 else 0
         
         return {
             'clinic_id': clinic_id,
             'total_images_uploaded': len(images),
-            'total_analyses': len([img for img in images if img.status == 'analyzed']),
+            'total_analyses': total_analyses,
             'active_subscriptions': active_subscriptions,
             'total_credits_allocated': total_credits,
             'remaining_credits': remaining_credits,
-            'credits_used': total_credits - remaining_credits
+            'credits_used': credits_used,
+            'usage_percentage': (credits_used / total_credits * 100) if total_credits > 0 else 0
         }
     
     # ========== FR-29: High-Risk Alerts ==========
@@ -504,3 +521,259 @@ class ClinicService:
         """Convert risk level to number for comparison"""
         risk_map = {'low': 1, 'medium': 2, 'high': 3, 'critical': 4}
         return risk_map.get(risk_level.lower(), 0)
+
+      
+    # ========== FR-25: Monitor Reports and Dashboard ==========
+    
+    def get_clinic_reports_summary(self, clinic_id: int, start_date: Optional[date] = None, 
+                                   end_date: Optional[date] = None) -> Dict[str, Any]:
+        """
+        Get summary of all reports for clinic patients (FR-25)
+        
+        Args:
+            clinic_id: Clinic ID
+            start_date: Optional start date filter
+            end_date: Optional end date filter
+            
+        Returns:
+            dict: Reports summary with statistics
+        """
+        if not self.patient_repository or not self.report_repository:
+            raise ValueError("Repositories not initialized")
+        
+        # Get all patients in clinic
+        patients = self.patient_repository.get_by_clinic_id(clinic_id)
+        
+        all_reports = []
+        for patient in patients:
+            reports = self.report_repository.get_by_patient(patient.patient_id)
+            # Filter by date range if provided
+            if start_date and end_date:
+                reports = [r for r in reports if r.created_at and 
+                          start_date <= r.created_at.date() <= end_date]
+            all_reports.extend(reports)
+        
+        # Calculate statistics
+        total_reports = len(all_reports)
+        reports_by_month = {}
+        unique_patients = set()
+        unique_doctors = set()
+        
+        for report in all_reports:
+            if report.created_at:
+                month_key = report.created_at.strftime('%Y-%m')
+                reports_by_month[month_key] = reports_by_month.get(month_key, 0) + 1
+            unique_patients.add(report.patient_id)
+            unique_doctors.add(report.doctor_id)
+        
+        return {
+            'clinic_id': clinic_id,
+            'total_reports': total_reports,
+            'unique_patients': len(unique_patients),
+            'unique_doctors': len(unique_doctors),
+            'reports_by_month': reports_by_month,
+            'date_range': {
+                'start_date': start_date.isoformat() if start_date else None,
+                'end_date': end_date.isoformat() if end_date else None
+            }
+        }
+    
+    # ========== FR-26: Clinic-wide Reports for Screening Campaigns ==========
+    
+    def generate_clinic_screening_report(self, clinic_id: int, campaign_name: Optional[str] = None,
+                                        start_date: Optional[date] = None, 
+                                        end_date: Optional[date] = None) -> Dict[str, Any]:
+        """
+        Generate clinic-wide report for screening campaigns (FR-26)
+        
+        Args:
+            clinic_id: Clinic ID
+            campaign_name: Optional campaign name
+            start_date: Optional start date for campaign
+            end_date: Optional end date for campaign
+            
+        Returns:
+            dict: Screening campaign report
+        """
+        if not self.patient_repository or not self.result_repository:
+            raise ValueError("Repositories not initialized")
+        
+        # Get risk aggregation
+        risk_data = self.get_clinic_risk_aggregation(clinic_id)
+        
+        # Get usage summary
+        usage_data = self.get_clinic_usage_summary(clinic_id)
+        
+        # Get reports summary
+        reports_data = self.get_clinic_reports_summary(clinic_id, start_date, end_date)
+        
+        # Get high-risk alerts
+        high_risk_alerts = self.get_high_risk_alerts(clinic_id, risk_level='high')
+        
+        # Compile screening report
+        report = {
+            'campaign_name': campaign_name or f"Screening Campaign - Clinic {clinic_id}",
+            'clinic_id': clinic_id,
+            'period': {
+                'start_date': start_date.isoformat() if start_date else None,
+                'end_date': end_date.isoformat() if end_date else None,
+                'generated_at': datetime.now().isoformat()
+            },
+            'summary': {
+                'total_patients_screened': risk_data.get('total_patients', 0),
+                'total_images_analyzed': usage_data.get('total_analyses', 0),
+                'total_reports_generated': reports_data.get('total_reports', 0),
+                'high_risk_cases': len(high_risk_alerts)
+            },
+            'risk_distribution': risk_data.get('risk_distribution', {}),
+            'usage_statistics': {
+                'images_uploaded': usage_data.get('total_images_uploaded', 0),
+                'credits_used': usage_data.get('credits_used', 0),
+                'remaining_credits': usage_data.get('remaining_credits', 0)
+            },
+            'reports_statistics': {
+                'total_reports': reports_data.get('total_reports', 0),
+                'unique_patients': reports_data.get('unique_patients', 0),
+                'unique_doctors': reports_data.get('unique_doctors', 0)
+            },
+            'high_risk_patients': high_risk_alerts[:20],  # Top 20
+            'recommendations': self._generate_screening_recommendations(risk_data, usage_data)
+        }
+        
+        return report
+    
+    def _generate_screening_recommendations(self, risk_data: Dict, usage_data: Dict) -> List[str]:
+        """Generate recommendations based on screening data"""
+        recommendations = []
+        
+        high_risk_count = risk_data.get('high_risk_patients_count', 0)
+        total_patients = risk_data.get('total_patients', 0)
+        
+        if total_patients > 0:
+            high_risk_percentage = (high_risk_count / total_patients) * 100
+            
+            if high_risk_percentage > 20:
+                recommendations.append(
+                    f"⚠️ High-risk rate is {high_risk_percentage:.1f}%. "
+                    "Consider increasing screening frequency and follow-up care."
+                )
+            elif high_risk_percentage > 10:
+                recommendations.append(
+                    f"⚠️ Moderate high-risk rate ({high_risk_percentage:.1f}%). "
+                    "Monitor these patients closely."
+                )
+        
+        remaining_credits = usage_data.get('remaining_credits', 0)
+        if remaining_credits < 100:
+            recommendations.append(
+                f"⚠️ Low credits remaining ({remaining_credits}). "
+                "Consider renewing subscription to continue screening services."
+            )
+        
+        if not recommendations:
+            recommendations.append("✅ Screening campaign is running smoothly. Continue regular monitoring.")
+        
+        return recommendations
+    
+    # ========== FR-30: Export Statistics for Research ==========
+    
+    def export_clinic_statistics(self, clinic_id: int, format: str = 'json') -> Dict[str, Any]:
+        """
+        Export clinic statistics for clinical research or management (FR-30)
+        
+        Args:
+            clinic_id: Clinic ID
+            format: Export format ('json', 'csv_data')
+            
+        Returns:
+            dict: Exported statistics data
+        """
+        # Gather all statistics
+        risk_data = self.get_clinic_risk_aggregation(clinic_id)
+        usage_data = self.get_clinic_usage_summary(clinic_id)
+        reports_data = self.get_clinic_reports_summary(clinic_id)
+        members_data = self.get_clinic_members(clinic_id)
+        trends_data = self.detect_abnormal_trends(clinic_id, days=90)
+        
+        # Compile comprehensive statistics
+        statistics = {
+            'clinic_id': clinic_id,
+            'export_date': datetime.now().isoformat(),
+            'export_format': format,
+            'clinic_info': {
+                'total_doctors': members_data.get('total_doctors', 0),
+                'total_patients': members_data.get('total_patients', 0)
+            },
+            'risk_statistics': {
+                'total_analyses': risk_data.get('total_analyses', 0),
+                'risk_distribution': risk_data.get('risk_distribution', {}),
+                'high_risk_patients_count': risk_data.get('high_risk_patients_count', 0)
+            },
+            'usage_statistics': {
+                'total_images_uploaded': usage_data.get('total_images_uploaded', 0),
+                'total_analyses': usage_data.get('total_analyses', 0),
+                'active_subscriptions': usage_data.get('active_subscriptions', 0),
+                'credits_used': usage_data.get('credits_used', 0),
+                'remaining_credits': usage_data.get('remaining_credits', 0)
+            },
+            'reports_statistics': {
+                'total_reports': reports_data.get('total_reports', 0),
+                'unique_patients': reports_data.get('unique_patients', 0),
+                'unique_doctors': reports_data.get('unique_doctors', 0),
+                'reports_by_month': reports_data.get('reports_by_month', {})
+            },
+            'trend_analysis': {
+                'abnormal_trends_detected': trends_data.get('abnormal_trends_detected', False),
+                'risk_increases_count': trends_data.get('summary', {}).get('risk_increases_count', 0),
+                'sudden_spikes_count': trends_data.get('summary', {}).get('sudden_spikes_count', 0)
+            }
+        }
+        
+        # Convert to CSV format if requested
+        if format == 'csv_data':
+            statistics['csv_format'] = self._convert_to_csv_format(statistics)
+        
+        return statistics
+    
+    def _convert_to_csv_format(self, statistics: Dict[str, Any]) -> List[List[str]]:
+        """Convert statistics to CSV format (list of rows)"""
+        csv_rows = []
+        
+        # Header
+        csv_rows.append(['Metric', 'Value'])
+        
+        # Clinic info
+        csv_rows.append(['Clinic ID', str(statistics['clinic_id'])])
+        csv_rows.append(['Total Doctors', str(statistics['clinic_info']['total_doctors'])])
+        csv_rows.append(['Total Patients', str(statistics['clinic_info']['total_patients'])])
+        csv_rows.append(['', ''])  # Empty row
+        
+        # Risk statistics
+        csv_rows.append(['Risk Statistics', ''])
+        csv_rows.append(['Total Analyses', str(statistics['risk_statistics']['total_analyses'])])
+        risk_dist = statistics['risk_statistics']['risk_distribution']
+        csv_rows.append(['Low Risk', str(risk_dist.get('low', 0))])
+        csv_rows.append(['Medium Risk', str(risk_dist.get('medium', 0))])
+        csv_rows.append(['High Risk', str(risk_dist.get('high', 0))])
+        csv_rows.append(['Critical Risk', str(risk_dist.get('critical', 0))])
+        csv_rows.append(['High Risk Patients', str(statistics['risk_statistics']['high_risk_patients_count'])])
+        csv_rows.append(['', ''])  # Empty row
+        
+        # Usage statistics
+        csv_rows.append(['Usage Statistics', ''])
+        usage = statistics['usage_statistics']
+        csv_rows.append(['Total Images Uploaded', str(usage['total_images_uploaded'])])
+        csv_rows.append(['Total Analyses', str(usage['total_analyses'])])
+        csv_rows.append(['Active Subscriptions', str(usage['active_subscriptions'])])
+        csv_rows.append(['Credits Used', str(usage['credits_used'])])
+        csv_rows.append(['Remaining Credits', str(usage['remaining_credits'])])
+        csv_rows.append(['', ''])  # Empty row
+        
+        # Reports statistics
+        csv_rows.append(['Reports Statistics', ''])
+        reports = statistics['reports_statistics']
+        csv_rows.append(['Total Reports', str(reports['total_reports'])])
+        csv_rows.append(['Unique Patients', str(reports['unique_patients'])])
+        csv_rows.append(['Unique Doctors', str(reports['unique_doctors'])])
+        
+        return csv_rows

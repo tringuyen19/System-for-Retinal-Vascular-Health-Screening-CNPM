@@ -1045,3 +1045,428 @@ def detect_abnormal_trends(clinic_id):
         return error_response(str(e), 400)
     except Exception as e:
         return error_response(f'Internal server error: {str(e)}', 500)
+
+@clinic_bp.route('/<int:clinic_id>/reports-summary', methods=['GET'])
+def get_clinic_reports_summary(clinic_id):
+    """
+    Get summary of all reports for clinic patients (FR-25)
+    ---
+    tags:
+      - Clinic
+    parameters:
+      - name: clinic_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          example: 1
+      - name: start_date
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+        description: Start date filter (YYYY-MM-DD)
+      - name: end_date
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+        description: End date filter (YYYY-MM-DD)
+    responses:
+      200:
+        description: Reports summary retrieved
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Success
+            data:
+              type: object
+              properties:
+                clinic_id:
+                  type: integer
+                total_reports:
+                  type: integer
+                unique_patients:
+                  type: integer
+                unique_doctors:
+                  type: integer
+                reports_by_month:
+                  type: object
+      400:
+        description: Invalid request
+      500:
+        description: Internal server error
+    """
+    try:
+        from datetime import date as date_type
+        
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+        
+        start_date = None
+        end_date = None
+        
+        if start_date_str:
+            try:
+                start_date = date_type.fromisoformat(start_date_str)
+            except ValueError:
+                return error_response('Invalid start_date format. Use YYYY-MM-DD', 400)
+        
+        if end_date_str:
+            try:
+                end_date = date_type.fromisoformat(end_date_str)
+            except ValueError:
+                return error_response('Invalid end_date format. Use YYYY-MM-DD', 400)
+        
+        summary = clinic_service.get_clinic_reports_summary(clinic_id, start_date, end_date)
+        return success_response(summary)
+    except ValueError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@clinic_bp.route('/<int:clinic_id>/screening-report', methods=['GET'])
+def generate_clinic_screening_report(clinic_id):
+    """
+    Generate clinic-wide report for screening campaigns (FR-26)
+    ---
+    tags:
+      - Clinic
+    parameters:
+      - name: clinic_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          example: 1
+      - name: campaign_name
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Optional campaign name
+      - name: start_date
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+        description: Campaign start date (YYYY-MM-DD)
+      - name: end_date
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+        description: Campaign end date (YYYY-MM-DD)
+    responses:
+      200:
+        description: Screening report generated
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Success
+            data:
+              type: object
+              properties:
+                campaign_name:
+                  type: string
+                  example: "Screening Campaign - Clinic 1"
+                clinic_id:
+                  type: integer
+                  example: 1
+                period:
+                  type: object
+                  properties:
+                    start_date:
+                      type: string
+                      format: date
+                      example: "2024-01-01"
+                    end_date:
+                      type: string
+                      format: date
+                      example: "2024-01-31"
+                    generated_at:
+                      type: string
+                      format: date-time
+                      example: "2024-01-15T10:30:00"
+                summary:
+                  type: object
+                  properties:
+                    total_patients_screened:
+                      type: integer
+                      example: 50
+                    total_images_analyzed:
+                      type: integer
+                      example: 120
+                    total_reports_generated:
+                      type: integer
+                      example: 45
+                    high_risk_cases:
+                      type: integer
+                      example: 8
+                risk_distribution:
+                  type: object
+                  properties:
+                    low:
+                      type: integer
+                      example: 30
+                    medium:
+                      type: integer
+                      example: 12
+                    high:
+                      type: integer
+                      example: 6
+                    critical:
+                      type: integer
+                      example: 2
+                usage_statistics:
+                  type: object
+                  properties:
+                    images_uploaded:
+                      type: integer
+                      example: 120
+                    credits_used:
+                      type: integer
+                      example: 100
+                    remaining_credits:
+                      type: integer
+                      example: 200
+                reports_statistics:
+                  type: object
+                  properties:
+                    total_reports:
+                      type: integer
+                      example: 45
+                    unique_patients:
+                      type: integer
+                      example: 40
+                    unique_doctors:
+                      type: integer
+                      example: 5
+                high_risk_patients:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      patient_id:
+                        type: integer
+                        example: 1
+                      patient_name:
+                        type: string
+                        example: "John Doe"
+                      risk_level:
+                        type: string
+                        example: "high"
+                      confidence:
+                        type: number
+                        format: float
+                        example: 0.95
+                recommendations:
+                  type: array
+                  items:
+                    type: string
+                  example:
+                    - "⚠️ High-risk rate is 16.0%. Consider increasing screening frequency and follow-up care."
+                    - "✅ Screening campaign is running smoothly. Continue regular monitoring."
+      400:
+        description: Invalid request
+      500:
+        description: Internal server error
+    """
+    try:
+        from datetime import date as date_type
+        
+        campaign_name = request.args.get('campaign_name')
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+        
+        start_date = None
+        end_date = None
+        
+        if start_date_str:
+            try:
+                start_date = date_type.fromisoformat(start_date_str)
+            except ValueError:
+                return error_response('Invalid start_date format. Use YYYY-MM-DD', 400)
+        
+        if end_date_str:
+            try:
+                end_date = date_type.fromisoformat(end_date_str)
+            except ValueError:
+                return error_response('Invalid end_date format. Use YYYY-MM-DD', 400)
+        
+        report = clinic_service.generate_clinic_screening_report(
+            clinic_id, campaign_name, start_date, end_date
+        )
+        return success_response(report)
+    except ValueError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@clinic_bp.route('/<int:clinic_id>/export-statistics', methods=['GET'])
+def export_clinic_statistics(clinic_id):
+    """
+    Export clinic statistics for clinical research or management (FR-30)
+    ---
+    tags:
+      - Clinic
+    parameters:
+      - name: clinic_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          example: 1
+      - name: format
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [json, csv_data]
+          default: json
+        description: Export format (json or csv_data)
+    responses:
+      200:
+        description: Statistics exported
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Success
+            data:
+              type: object
+              properties:
+                clinic_id:
+                  type: integer
+                  example: 1
+                export_date:
+                  type: string
+                  format: date-time
+                  example: "2024-01-15T10:30:00"
+                export_format:
+                  type: string
+                  enum: [json, csv_data]
+                  example: "json"
+                clinic_info:
+                  type: object
+                  properties:
+                    total_doctors:
+                      type: integer
+                      example: 5
+                    total_patients:
+                      type: integer
+                      example: 50
+                risk_statistics:
+                  type: object
+                  properties:
+                    total_analyses:
+                      type: integer
+                      example: 120
+                    risk_distribution:
+                      type: object
+                      properties:
+                        low:
+                          type: integer
+                          example: 80
+                        medium:
+                          type: integer
+                          example: 25
+                        high:
+                          type: integer
+                          example: 12
+                        critical:
+                          type: integer
+                          example: 3
+                    high_risk_patients_count:
+                      type: integer
+                      example: 15
+                usage_statistics:
+                  type: object
+                  properties:
+                    total_images_uploaded:
+                      type: integer
+                      example: 150
+                    total_analyses:
+                      type: integer
+                      example: 120
+                    active_subscriptions:
+                      type: integer
+                      example: 2
+                    credits_used:
+                      type: integer
+                      example: 100
+                    remaining_credits:
+                      type: integer
+                      example: 200
+                reports_statistics:
+                  type: object
+                  properties:
+                    total_reports:
+                      type: integer
+                      example: 45
+                    unique_patients:
+                      type: integer
+                      example: 40
+                    unique_doctors:
+                      type: integer
+                      example: 5
+                    reports_by_month:
+                      type: object
+                      additionalProperties:
+                        type: integer
+                      example:
+                        "2024-01": 20
+                        "2024-02": 25
+                trend_analysis:
+                  type: object
+                  properties:
+                    abnormal_trends_detected:
+                      type: boolean
+                      example: true
+                    risk_increases_count:
+                      type: integer
+                      example: 5
+                    sudden_spikes_count:
+                      type: integer
+                      example: 2
+                csv_format:
+                  type: array
+                  description: CSV format data (only if format=csv_data)
+                  items:
+                    type: array
+                    items:
+                      type: string
+                  example:
+                    - ["Metric", "Value"]
+                    - ["Clinic ID", "1"]
+                    - ["Total Doctors", "5"]
+                    - ["Total Patients", "50"]
+      400:
+        description: Invalid request
+      500:
+        description: Internal server error
+    """
+    try:
+        export_format = request.args.get('format', 'json')
+        
+        if export_format not in ['json', 'csv_data']:
+            return error_response('Invalid format. Must be "json" or "csv_data"', 400)
+        
+        statistics = clinic_service.export_clinic_statistics(clinic_id, format=export_format)
+        return success_response(statistics)
+    except ValueError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
