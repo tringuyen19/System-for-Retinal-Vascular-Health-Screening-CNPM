@@ -1,6 +1,9 @@
-from infrastructure.databases.mssql import init_mssql
+# Import Base first to ensure it's available for all models
+from infrastructure.databases.base import Base
 
 # Import AURA System models (Retinal Health Screening)
+# These imports register models with SQLAlchemy Base
+# Import models BEFORE importing mssql to avoid circular import issues
 from infrastructure.models.role_model import RoleModel
 from infrastructure.models.clinic_model import ClinicModel
 from infrastructure.models.account_model import AccountModel
@@ -26,8 +29,9 @@ from infrastructure.models.billing.service_package_model import ServicePackageMo
 from infrastructure.models.billing.subscription_model import SubscriptionModel
 from infrastructure.models.billing.payment_model import PaymentModel
 
+
 def init_db(app):
+    """Initialize database and create all tables"""
+    # Lazy import to avoid circular import issues
+    from infrastructure.databases.mssql import init_mssql
     init_mssql(app)
-    
-# Migration Entities -> tables
-from infrastructure.databases.mssql import Base

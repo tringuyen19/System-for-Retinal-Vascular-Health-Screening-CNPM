@@ -43,7 +43,20 @@ class AdminService:
         self.payment_repository = payment_repository
         self.subscription_repository = subscription_repository
         self.model_version_repository = model_version_repository
-    
+      
+        # Retraining policies storage (in-memory, can be persisted to file/DB later)
+        self._retraining_policies = {
+            'auto_retrain': False,
+            'retrain_threshold': 0.85,
+            'retrain_schedule': 'monthly',  # daily, weekly, monthly, quarterly
+            'min_samples_for_retrain': 1000,
+            'min_accuracy_improvement': 0.02,  # 2% improvement required
+            'last_retrain': None,
+            'next_scheduled_retrain': None,
+            'retrain_on_error_rate': True,
+            'max_error_rate_threshold': 0.15  # 15% error rate triggers retrain
+        }
+
     # ========== FR-35: Global Dashboard ==========
     
     def get_dashboard_summary(self) -> Dict[str, Any]:
@@ -54,9 +67,16 @@ class AdminService:
         # Get all accounts
         all_accounts = self.account_repository.get_all()
         
-        # Count by role
-        users_count = sum(1 for acc in all_accounts if acc.role_id == 1)  # Assuming role_id 1 = Patient
-        doctors_count = sum(1 for acc in all_accounts if acc.role_id == 2)  # Assuming role_id 2 = Doctor
+        # Count by role - Get role names dynamically
+        from infrastructure.repositories.role_repository import RoleRepository
+        from infrastructure.databases.mssql import session
+        role_repo = RoleRepository(session)
+        
+        patient_role = role_repo.get_by_name('Patient')
+        doctor_role = role_repo.get_by_name('Doctor')
+        
+        users_count = sum(1 for acc in all_accounts if patient_role and acc.role_id == patient_role.role_id)
+        doctors_count = sum(1 for acc in all_accounts if doctor_role and acc.role_id == doctor_role.role_id)
         clinics_count = len(self.clinic_repository.get_all())
         
         # Get all images
@@ -306,14 +326,44 @@ class AdminService:
                 'trained_at': active_model.trained_at.isoformat() if active_model.trained_at else None
             }
         
+        # Get last retrain date from active model if available
+        last_retrain = None
+        if active_model and active_model.trained_at:
+            last_retrain = active_model.trained_at.isoformat()
+            # Update stored policy with actual last retrain date
+            if not self._retraining_policies.get('last_retrain'):
+                self._retraining_policies['last_retrain'] = last_retrain
+        
+        # Calculate next scheduled retrain if auto_retrain is enabled
+        next_scheduled = None
+        if self._retraining_policies.get('auto_retrain') and last_retrain:
+            from datetime import datetime, timedelta
+            last_retrain_dt = datetime.fromisoformat(last_retrain.replace('Z', '+00:00'))
+            schedule_days = {
+                'daily': 1,
+                'weekly': 7,
+                'monthly': 30,
+                'quarterly': 90
+            }
+            days = schedule_days.get(self._retraining_policies.get('retrain_schedule', 'monthly'), 30)
+            next_scheduled = (last_retrain_dt + timedelta(days=days)).isoformat()
+        
+        retraining_policies = {
+            'auto_retrain': self._retraining_policies.get('auto_retrain', False),
+            'retrain_threshold': self._retraining_policies.get('retrain_threshold', 0.85),
+            'retrain_schedule': self._retraining_policies.get('retrain_schedule', 'monthly'),
+            'min_samples_for_retrain': self._retraining_policies.get('min_samples_for_retrain', 1000),
+            'min_accuracy_improvement': self._retraining_policies.get('min_accuracy_improvement', 0.02),
+            'last_retrain': last_retrain or self._retraining_policies.get('last_retrain'),
+            'next_scheduled_retrain': next_scheduled or self._retraining_policies.get('next_scheduled_retrain'),
+            'retrain_on_error_rate': self._retraining_policies.get('retrain_on_error_rate', True),
+            'max_error_rate_threshold': self._retraining_policies.get('max_error_rate_threshold', 0.15)
+        }
+
         return {
             'active_model': active_config,
             'all_models': models_info,
-            'retraining_policies': {
-                'auto_retrain': False,  # Placeholder - can be extended
-                'retrain_threshold': 0.85,  # Placeholder
-                'last_retrain': active_model.trained_at.isoformat() if active_model and active_model.trained_at else None
-            }
+            'retraining_policies': retraining_policies
         }
     
     def update_ai_configuration(self, threshold_config: Optional[str] = None,
@@ -322,7 +372,9 @@ class AdminService:
         Update AI configuration (FR-33)
         Args:
             threshold_config: New threshold configuration (JSON string)
-            retraining_policy: Retraining policy settings
+            retraining_policy: Retraining policy settings (dict with keys: auto_retrain, retrain_threshold, 
+                            retrain_schedule, min_samples_for_retrain, min_accuracy_improvement, 
+                            retrain_on_error_rate, max_error_rate_threshold)    
         """
         active_model = self.model_version_repository.get_active_model()
         if not active_model:
@@ -332,6 +384,7 @@ class AdminService:
         if threshold_config:
             updates['threshold_config'] = threshold_config
         
+        # Update threshold config in model if provided
         if updates:
             updated_model = self.model_version_repository.update(
                 active_model.ai_model_version_id,
@@ -340,6 +393,45 @@ class AdminService:
             if not updated_model:
                 raise ValueError("Failed to update AI configuration")
         
+        # Update retraining policies if provided
+        if retraining_policy:
+            # Validate and update retraining policy fields
+            allowed_keys = [
+                'auto_retrain', 'retrain_threshold', 'retrain_schedule',
+                'min_samples_for_retrain', 'min_accuracy_improvement',
+                'retrain_on_error_rate', 'max_error_rate_threshold'
+            ]
+            
+            for key, value in retraining_policy.items():
+                if key in allowed_keys:
+                    self._retraining_policies[key] = value
+                else:
+                    raise ValueError(f"Invalid retraining policy key: {key}. Allowed keys: {allowed_keys}")
+            
+            # Validate retrain_threshold range
+            if 'retrain_threshold' in retraining_policy:
+                threshold = retraining_policy['retrain_threshold']
+                if not isinstance(threshold, (int, float)) or not (0 <= threshold <= 1):
+                    raise ValueError("retrain_threshold must be a number between 0 and 1")
+            
+            # Validate retrain_schedule
+            if 'retrain_schedule' in retraining_policy:
+                schedule = retraining_policy['retrain_schedule']
+                if schedule not in ['daily', 'weekly', 'monthly', 'quarterly']:
+                    raise ValueError("retrain_schedule must be one of: daily, weekly, monthly, quarterly")
+            
+            # Validate min_accuracy_improvement
+            if 'min_accuracy_improvement' in retraining_policy:
+                improvement = retraining_policy['min_accuracy_improvement']
+                if not isinstance(improvement, (int, float)) or not (0 <= improvement <= 1):
+                    raise ValueError("min_accuracy_improvement must be a number between 0 and 1")
+            
+            # Validate max_error_rate_threshold
+            if 'max_error_rate_threshold' in retraining_policy:
+                error_rate = retraining_policy['max_error_rate_threshold']
+                if not isinstance(error_rate, (int, float)) or not (0 <= error_rate <= 1):
+                    raise ValueError("max_error_rate_threshold must be a number between 0 and 1")
+
         return self.get_ai_configuration()
     
     # ========== Helper Methods ==========

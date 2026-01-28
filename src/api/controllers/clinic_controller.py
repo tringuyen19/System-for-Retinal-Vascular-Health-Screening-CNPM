@@ -435,6 +435,161 @@ def reject_clinic(clinic_id):
         return error_response(f'Internal server error: {str(e)}', 500)
 
 
+@clinic_bp.route('/<int:clinic_id>/approve', methods=['PUT'])
+def approve_clinic(clinic_id):
+    """
+    Approve clinic registration (FR-38) - Admin only
+    
+    Workflow: pending → verified, suspended → verified
+    Can approve pending clinics or unsuspend suspended clinics.
+    ---
+    tags:
+      - Clinic
+    consumes:
+      - application/json
+    produces:
+      - application/json
+    parameters:
+      - name: clinic_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          example: 1
+      - in: body
+        name: body
+        required: false
+        schema:
+          type: object
+          properties:
+            admin_notes:
+              type: string
+              example: "All documents verified. License valid."
+              description: Optional notes from admin
+    responses:
+      200:
+        description: Clinic approved successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Clinic approved successfully
+            data:
+              type: object
+              properties:
+                clinic_id:
+                  type: integer
+                name:
+                  type: string
+                verification_status:
+                  type: string
+                  enum: [verified]
+      400:
+        description: Invalid request (clinic not in pending/suspended status)
+      404:
+        description: Clinic not found
+    """
+    try:
+        from domain.exceptions import NotFoundException
+        
+        data = request.get_json() or {}
+        admin_notes = data.get('admin_notes')
+        
+        # Call SERVICE ✅
+        clinic = clinic_service.approve_clinic(clinic_id, admin_notes=admin_notes)
+        if not clinic:
+            return not_found_response('Clinic not found')
+        
+        schema = ClinicResponseSchema()
+        return success_response(schema.dump(clinic), 'Clinic approved successfully')
+        
+    except NotFoundException as e:
+        return not_found_response(str(e))
+    except ValueError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@clinic_bp.route('/<int:clinic_id>/suspend', methods=['PUT'])
+def suspend_clinic(clinic_id):
+    """
+    Suspend clinic registration (FR-38) - Admin only
+    
+    Workflow: verified → suspended
+    Only verified clinics can be suspended.
+    Suspension reason is recommended for audit trail.
+    ---
+    tags:
+      - Clinic
+    consumes:
+      - application/json
+    produces:
+      - application/json
+    parameters:
+      - name: clinic_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          example: 1
+      - in: body
+        name: body
+        required: false
+        schema:
+          type: object
+          properties:
+            suspension_reason:
+              type: string
+              example: "Violation of terms of service"
+              description: Reason for suspension (recommended)
+    responses:
+      200:
+        description: Clinic suspended successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: Clinic suspended successfully
+            data:
+              type: object
+              properties:
+                clinic_id:
+                  type: integer
+                name:
+                  type: string
+                verification_status:
+                  type: string
+                  enum: [suspended]
+      400:
+        description: Invalid request (clinic not in verified status)
+      404:
+        description: Clinic not found
+    """
+    try:
+        from domain.exceptions import NotFoundException
+        
+        data = request.get_json() or {}
+        suspension_reason = data.get('suspension_reason')
+        
+        # Call SERVICE ✅
+        clinic = clinic_service.suspend_clinic(clinic_id, suspension_reason=suspension_reason)
+        if not clinic:
+            return not_found_response('Clinic not found')
+        
+        schema = ClinicResponseSchema()
+        return success_response(schema.dump(clinic), 'Clinic suspended successfully')
+        
+    except NotFoundException as e:
+        return not_found_response(str(e))
+    except ValueError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
 @clinic_bp.route('/<int:clinic_id>', methods=['PUT'])
 def update_clinic(clinic_id):
     """

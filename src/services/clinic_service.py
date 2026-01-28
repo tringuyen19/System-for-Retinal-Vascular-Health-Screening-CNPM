@@ -139,14 +139,28 @@ class ClinicService:
         
         Args:
             clinic_id: Clinic ID
-            admin_notes: Optional notes from admin
+            admin_notes: Optional notes from admin (for audit trail)
             
         Returns:
             Clinic: Updated clinic with verification_status = 'verified'
+            
+        Raises:
+            ValueError: If clinic is not in 'pending' or 'suspended' status
         """
         clinic = self.get_clinic_by_id(clinic_id)
         if not clinic:
             raise NotFoundException(f"Clinic {clinic_id} not found")
+        
+        # Validate workflow: Only pending or suspended clinics can be approved
+        if clinic.verification_status not in ['pending', 'suspended']:
+            raise ValueError(
+                f"Cannot approve clinic. Current status: {clinic.verification_status}. "
+                f"Only clinics with 'pending' or 'suspended' status can be approved."
+            )
+        
+        # Admin notes are recommended but not enforced
+        if not admin_notes:
+            print(f"Info: Approving clinic {clinic_id} without admin notes")
         
         return self.repository.approve_clinic(clinic_id)
     

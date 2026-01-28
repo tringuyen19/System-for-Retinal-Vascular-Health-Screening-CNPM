@@ -124,6 +124,7 @@ from .payment_schema import (
 # Admin Schemas
 from .admin_schema import (
     AiConfigurationUpdateRequestSchema,
+    RetrainingPolicySchema,
     AdminDashboardResponseSchema,
     AdminAnalyticsResponseSchema
 )
@@ -196,6 +197,7 @@ __all__ = [
 
     # Admin
     'AiConfigurationUpdateRequestSchema',
+    'RetrainingPolicySchema',
     'AdminDashboardResponseSchema',
     'AdminAnalyticsResponseSchema',
 ]
