@@ -374,7 +374,7 @@ class AdminService:
             threshold_config: New threshold configuration (JSON string)
             retraining_policy: Retraining policy settings (dict with keys: auto_retrain, retrain_threshold, 
                             retrain_schedule, min_samples_for_retrain, min_accuracy_improvement, 
-                            retrain_on_error_rate, max_error_rate_threshold)    
+                            retrain_on_error_rate, max_error_rate_threshold)
         """
         active_model = self.model_version_repository.get_active_model()
         if not active_model:
