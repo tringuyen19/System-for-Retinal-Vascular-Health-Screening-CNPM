@@ -121,6 +121,13 @@ from .payment_schema import (
     PaymentResponseSchema
 )
 
+# Admin Schemas
+from .admin_schema import (
+    AiConfigurationUpdateRequestSchema,
+    AdminDashboardResponseSchema,
+    AdminAnalyticsResponseSchema
+)
+
 __all__ = [
     # Authentication
     'LoginRequestSchema',
@@ -186,5 +193,10 @@ __all__ = [
     'PaymentCreateRequestSchema',
     'PaymentUpdateRequestSchema',
     'PaymentResponseSchema',
+
+    # Admin
+    'AiConfigurationUpdateRequestSchema',
+    'AdminDashboardResponseSchema',
+    'AdminAnalyticsResponseSchema',
 ]
 

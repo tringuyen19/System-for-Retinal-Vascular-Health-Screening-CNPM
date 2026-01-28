@@ -113,6 +113,41 @@ class ClinicRepository(IClinicRepository):
         finally:
             self.session.close()
     
+    def suspend_clinic(self, clinic_id: int) -> Optional[Clinic]:
+        """Suspend a clinic (FR-38) - Can suspend verified clinics"""
+        try:
+            clinic_model = self.session.query(ClinicModel).filter_by(clinic_id=clinic_id).first()
+            if not clinic_model:
+                return None
+            clinic_model.verification_status = 'suspended'
+            self.session.commit()
+            self.session.refresh(clinic_model)
+            return self._to_domain(clinic_model)
+        except Exception as e:
+            self.session.rollback()
+            raise ValueError(f'Error suspending clinic: {str(e)}')
+        finally:
+            self.session.close()
+    
+    def approve_clinic(self, clinic_id: int) -> Optional[Clinic]:
+        """Approve a clinic (FR-38) - Alias for verify_clinic, but can also unsuspend"""
+        try:
+            clinic_model = self.session.query(ClinicModel).filter_by(clinic_id=clinic_id).first()
+            if not clinic_model:
+                return None
+            # Can approve from pending or unsuspend from suspended
+            if clinic_model.verification_status in ['pending', 'suspended']:
+                clinic_model.verification_status = 'verified'
+                self.session.commit()
+                self.session.refresh(clinic_model)
+                return self._to_domain(clinic_model)
+            return self._to_domain(clinic_model)
+        except Exception as e:
+            self.session.rollback()
+            raise ValueError(f'Error approving clinic: {str(e)}')
+        finally:
+            self.session.close()
+
     def update(self, clinic_id: int, **kwargs) -> Optional[Clinic]:
         try:
             clinic_model = self.session.query(ClinicModel).filter_by(clinic_id=clinic_id).first()

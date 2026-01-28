@@ -246,14 +246,7 @@ def get_verified_clinics():
         
         return success_response({
             'count': len(clinics),
-            'clinics': [{
-                'clinic_id': c.clinic_id,
-                'clinic_name': c.clinic_name,
-                'address': c.address,
-                'phone_number': c.phone_number,
-                'logo_url': c.logo_url,
-                'description': c.description
-            } for c in clinics]
+            'clinics': ClinicResponseSchema(many=True).dump(clinics)
         })
         
     except Exception as e:
@@ -277,13 +270,7 @@ def get_pending_clinics():
         
         return success_response({
             'count': len(clinics),
-            'clinics': [{
-                'clinic_id': c.clinic_id,
-                'clinic_name': c.clinic_name,
-                'address': c.address,
-                'phone_number': c.phone_number,
-                'description': c.description
-            } for c in clinics]
+            'clinics': ClinicResponseSchema(many=True).dump(clinics)
         })
         
     except Exception as e:
@@ -356,11 +343,8 @@ def verify_clinic(clinic_id):
         if not clinic:
             return not_found_response('Clinic not found')
         
-        return success_response({
-            'clinic_id': clinic.clinic_id,
-            'clinic_name': clinic.clinic_name,
-            'verification_status': clinic.verification_status
-        }, 'Clinic verified successfully')
+        schema = ClinicResponseSchema()
+        return success_response(schema.dump(clinic), 'Clinic verified successfully')
     
     except NotFoundException as e:
         return not_found_response(str(e))
@@ -518,15 +502,8 @@ def update_clinic(clinic_id):
         if not clinic:
             return not_found_response('Clinic not found')
         
-        return success_response({
-            'clinic_id': clinic.clinic_id,
-            'clinic_name': clinic.clinic_name,
-            'address': clinic.address,
-            'phone_number': clinic.phone_number,
-            'logo_url': clinic.logo_url,
-            'description': clinic.description,
-            'verification_status': clinic.verification_status
-        }, 'Clinic updated successfully')
+        schema = ClinicResponseSchema()
+        return success_response(schema.dump(clinic), 'Clinic updated successfully')
         
     except ValueError as e:
         return error_response(str(e), 400)

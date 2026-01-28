@@ -132,6 +132,52 @@ class ClinicService:
         
         return self.repository.reject_clinic(clinic_id)
     
+    def approve_clinic(self, clinic_id: int, admin_notes: Optional[str] = None) -> Optional[Clinic]:
+        """
+        Approve clinic registration (FR-38)
+        Can approve pending clinics or unsuspend suspended clinics
+        
+        Args:
+            clinic_id: Clinic ID
+            admin_notes: Optional notes from admin
+            
+        Returns:
+            Clinic: Updated clinic with verification_status = 'verified'
+        """
+        clinic = self.get_clinic_by_id(clinic_id)
+        if not clinic:
+            raise NotFoundException(f"Clinic {clinic_id} not found")
+        
+        return self.repository.approve_clinic(clinic_id)
+    
+    def suspend_clinic(self, clinic_id: int, suspension_reason: Optional[str] = None) -> Optional[Clinic]:
+        """
+        Suspend clinic registration (FR-38)
+        Can suspend verified clinics
+        
+        Args:
+            clinic_id: Clinic ID
+            suspension_reason: Reason for suspension (recommended for audit trail)
+            
+        Returns:
+            Clinic: Updated clinic with verification_status = 'suspended'
+        """
+        clinic = self.get_clinic_by_id(clinic_id)
+        if not clinic:
+            raise NotFoundException(f"Clinic {clinic_id} not found")
+        
+        # Can only suspend verified clinics
+        if clinic.verification_status != 'verified':
+            raise ValueError(
+                f"Cannot suspend clinic. Current status: {clinic.verification_status}. "
+                f"Only verified clinics can be suspended."
+            )
+        
+        if not suspension_reason:
+            print(f"Warning: Suspending clinic {clinic_id} without suspension reason")
+        
+        return self.repository.suspend_clinic(clinic_id)
+
     def update_clinic(self, clinic_id: int, **kwargs) -> Optional[Clinic]:
         """Update clinic information"""
         return self.repository.update(clinic_id, **kwargs)
