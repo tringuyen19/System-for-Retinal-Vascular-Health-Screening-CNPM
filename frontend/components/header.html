@@ -1,0 +1,50 @@
+<!-- AURA Header Component - Include trong template hoặc load bằng JS -->
+<header class="aura-header navbar navbar-expand-lg navbar-dark fixed-top" style="background-color: #212121;">
+  <div class="container-fluid">
+    <a class="navbar-brand d-flex align-items-center" href="index.html">
+      <span class="fw-bold text-white">AURA</span>
+      <small class="text-white-50 ms-2 d-none d-md-inline">Retinal AI</small>
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarMain">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item">
+          <a class="nav-link" href="index.html">Trang chủ</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="login.html">Đăng nhập</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="register.html">Đăng ký</a>
+        </li>
+      </ul>
+      <ul class="navbar-nav ms-auto align-items-center">
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="notifDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Thông báo">
+            <i class="bi bi-bell"></i>
+            <span class="badge bg-danger rounded-pill ms-1 d-none" id="notifCount">0</span>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notifDropdown">
+            <li><h6 class="dropdown-header">Thông báo</h6></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item text-muted small" href="#">Chưa có thông báo</a></li>
+          </ul>
+        </li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-person-circle me-1"></i>
+            <span id="headerUserName">Tài khoản</span>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+            <li><a class="dropdown-item" href="#" id="headerProfileLink">Hồ sơ</a></li>
+            <li><a class="dropdown-item" href="#" id="headerSettingsLink">Cài đặt</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item text-danger" href="#" id="headerLogout">Đăng xuất</a></li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+  </div>
+</header>

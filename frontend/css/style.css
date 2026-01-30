@@ -1,0 +1,127 @@
+/**
+ * AURA Frontend - Custom styles (Bước 1.4)
+ * CSS Variables (colors, spacing), global styles
+ * Tham chiếu: design/DESIGN_REFERENCE.md
+ */
+
+/* ========== CSS Variables ========== */
+:root {
+  /* Colors - Design Reference */
+  --aura-primary: #1976D2;
+  --aura-primary-dark: #1565C0;
+  --aura-primary-light: #BBDEFB;
+  --aura-secondary: #424242;
+  --aura-secondary-light: #757575;
+  --aura-success: #4CAF50;
+  --aura-warning: #FF9800;
+  --aura-danger: #F44336;
+  --aura-info: #2196F3;
+  /* Backgrounds */
+  --aura-bg-light: #F5F5F5;
+  --aura-bg-white: #FFFFFF;
+  --aura-bg-dark: #212121;
+  /* Text */
+  --aura-text-primary: #212121;
+  --aura-text-secondary: #757575;
+  --aura-text-disabled: #BDBDBD;
+  --aura-text-white: #FFFFFF;
+  /* Spacing (base 8px) */
+  --aura-space-xs: 0.25rem;   /* 4px */
+  --aura-space-s: 0.5rem;    /* 8px */
+  --aura-space-m: 1rem;      /* 16px */
+  --aura-space-l: 1.5rem;    /* 24px */
+  --aura-space-xl: 2rem;     /* 32px */
+  --aura-space-xxl: 3rem;     /* 48px */
+  /* Other */
+  --aura-radius: 4px;
+  --aura-radius-lg: 8px;
+  --aura-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --aura-shadow-hover: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* ========== Global styles ========== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Roboto", system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--aura-text-primary);
+  background-color: var(--aura-bg-light);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin-top: 0;
+  margin-bottom: var(--aura-space-s);
+  font-weight: 600;
+  line-height: 1.2;
+}
+h1 { font-size: 2rem; font-weight: 700; }
+h2 { font-size: 1.5rem; }
+h3 { font-size: 1.25rem; }
+h4 { font-size: 1.125rem; }
+
+a {
+  color: var(--aura-primary);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--aura-primary-dark);
+  text-decoration: underline;
+}
+
+/* Buttons base (override Bootstrap nếu cần) */
+.btn-primary {
+  background-color: var(--aura-primary);
+  border-color: var(--aura-primary);
+}
+.btn-primary:hover {
+  background-color: var(--aura-primary-dark);
+  border-color: var(--aura-primary-dark);
+}
+
+.container {
+  width: 100%;
+  max-width: 1140px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--aura-space-m);
+  padding-right: var(--aura-space-m);
+}
+
+/* Layout: chỉ trang có header fixed mới cần padding-top (index.html thêm class aura-fixed-header vào body) */
+body.aura-fixed-header { padding-top: 56px; }
+
+/* Header */
+.aura-header .navbar-brand:hover { color: #fff !important; }
+.aura-header .nav-link { color: rgba(255, 255, 255, 0.85) !important; }
+.aura-header .nav-link:hover,
+.aura-header .nav-link.active { color: #fff !important; }
+
+/* Sidebar */
+.aura-sidebar {
+  min-height: calc(100vh - 56px);
+}
+.aura-sidebar .nav-link {
+  color: #424242;
+}
+.aura-sidebar .nav-link:hover {
+  background-color: #e0e0e0;
+  color: var(--aura-primary);
+}
+.aura-sidebar .nav-link.active {
+  background-color: var(--aura-primary-light);
+  color: var(--aura-primary);
+  font-weight: 500;
+}
+
+/* Main content area */
+main.aura-main { min-height: calc(100vh - 56px); }
+
+/* Footer */
+.aura-footer { flex-shrink: 0; }
