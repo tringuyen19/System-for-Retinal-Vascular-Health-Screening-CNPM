@@ -91,6 +91,13 @@ from .notification_schema import (
     NotificationResponseSchema
 )
 
+from .notification_template_schema import (
+    NotificationTemplateCreateRequestSchema,
+    NotificationTemplateUpdateRequestSchema,
+    NotificationTemplateRenderRequestSchema,
+    NotificationTemplateResponseSchema
+)
+
 from .conversation_schema import (
     ConversationCreateRequestSchema,
     ConversationUpdateRequestSchema,
@@ -185,6 +192,10 @@ __all__ = [
     'NotificationCreateRequestSchema',
     'NotificationUpdateRequestSchema',
     'NotificationResponseSchema',
+    'NotificationTemplateCreateRequestSchema',
+    'NotificationTemplateUpdateRequestSchema',
+    'NotificationTemplateRenderRequestSchema',
+    'NotificationTemplateResponseSchema',
     'ConversationCreateRequestSchema',
     'ConversationUpdateRequestSchema',
     'ConversationResponseSchema',
