@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Danh sách bệnh nhân | Bác sĩ | AURA</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="../css/style.css" rel="stylesheet">
+</head>
+<body class="d-flex flex-column min-vh-100 aura-fixed-header">
+  <header class="aura-header navbar navbar-expand-lg navbar-dark fixed-top" style="background-color: #212121;">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="../index.html">AURA</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain"><span class="navbar-toggler-icon"></span></button>
+      <div class="collapse navbar-collapse" id="navbarMain">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item"><a class="nav-link" href="../index.html">Trang chủ</a></li>
+          <li class="nav-item"><a class="nav-link" href="dashboard.html">Dashboard</a></li>
+        </ul>
+        <ul class="navbar-nav ms-auto align-items-center">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown"><i class="bi bi-person-circle me-1"></i><span id="headerUserName">Tài khoản</span></a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="profile.html">Hồ sơ</a></li>
+              <li><a class="dropdown-item" href="settings.html">Cài đặt</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item text-danger" href="#" id="headerLogout">Đăng xuất</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </header>
+
+  <div class="d-flex flex-grow-1" style="padding-top: 56px;">
+    <aside class="aura-sidebar d-none d-md-flex flex-shrink-0 border-end bg-light" style="width: 250px; background-color: #f5f5f5 !important;">
+      <nav class="nav flex-column p-3 w-100">
+        <span class="text-muted small text-uppercase px-3 mb-2">Bác sĩ</span>
+        <a class="nav-link rounded mb-1" href="dashboard.html"><i class="bi bi-house-door me-2"></i>Dashboard</a>
+        <a class="nav-link rounded mb-1 active" href="patients.html"><i class="bi bi-people me-2"></i>Bệnh nhân</a>
+        <a class="nav-link rounded mb-1" href="reviews.html"><i class="bi bi-clipboard-check me-2"></i>Duyệt kết quả AI</a>
+        <a class="nav-link rounded mb-1" href="create-report.html"><i class="bi bi-file-earmark-plus me-2"></i>Tạo báo cáo</a>
+        <a class="nav-link rounded mb-1" href="messages.html"><i class="bi bi-chat-dots me-2"></i>Tin nhắn</a>
+        <hr class="my-2">
+        <a class="nav-link rounded mb-1" href="profile.html"><i class="bi bi-person me-2"></i>Hồ sơ</a>
+        <a class="nav-link rounded mb-1" href="settings.html"><i class="bi bi-gear me-2"></i>Cài đặt</a>
+      </nav>
+    </aside>
+
+    <main class="flex-grow-1 p-4" style="background-color: #f5f5f5;">
+      <div class="container-fluid">
+        <h1 class="h3 mb-4">Danh sách bệnh nhân</h1>
+        <div id="pageError" class="alert alert-danger d-none"></div>
+        <div class="card border-0 shadow-sm mb-3">
+          <div class="card-body">
+            <form id="searchForm" class="row g-2">
+              <div class="col-md-4">
+                <label class="form-label small">Tên bệnh nhân</label>
+                <input type="text" class="form-control" id="searchName" name="name" placeholder="Tìm theo tên...">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small">Mức rủi ro</label>
+                <select class="form-select" id="searchRisk" name="risk_level">
+                  <option value="">Tất cả</option>
+                  <option value="low">Thấp</option>
+                  <option value="medium">Trung bình</option>
+                  <option value="high">Cao</option>
+                  <option value="critical">Nghiêm trọng</option>
+                </select>
+              </div>
+              <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2"><i class="bi bi-search me-1"></i>Tìm kiếm</button>
+                <button type="button" class="btn btn-outline-secondary" id="btnReset">Xóa bộ lọc</button>
+              </div>
+            </form>
+          </div>
+        </div>
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white"><h5 class="mb-0">Kết quả</h5></div>
+          <div class="card-body">
+            <div id="patientsTableWrap">
+              <div id="patientsLoading" class="text-center py-4">Đang tải...</div>
+              <div id="patientsContent" class="d-none">
+                <div class="table-responsive">
+                  <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                      <tr>
+                        <th>ID</th>
+                        <th>Họ tên</th>
+                        <th>Ngày sinh</th>
+                        <th>Giới tính</th>
+                        <th>Mức rủi ro</th>
+                        <th>Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody id="patientsBody"></tbody>
+                  </table>
+                </div>
+                <p class="text-muted small mb-0" id="patientsSummary"></p>
+              </div>
+              <div id="patientsEmpty" class="text-muted text-center py-4 d-none">Không có bệnh nhân nào.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal fade" id="patientDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Chi tiết bệnh nhân</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="patientDetailBody">Đang tải...</div>
+        <div class="modal-footer">
+          <a href="#" id="linkCreateReport" class="btn btn-primary">Tạo báo cáo</a>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="aura-footer py-3 border-top" style="background-color: #f5f5f5;">
+    <div class="container-fluid"><span class="text-muted small">&copy; 2025 AURA</span></div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/components/header.js"></script>
+  <script src="../js/components/sidebar.js"></script>
+  <script src="../js/components/alert.js"></script>
+  <script src="../js/pages/doctor-patients.js"></script>
+</body>
+</html>
