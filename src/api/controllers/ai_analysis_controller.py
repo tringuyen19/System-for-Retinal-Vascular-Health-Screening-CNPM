@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
+from api.middleware.auth_middleware import require_roles, require_role
 from infrastructure.repositories.ai_analysis_repository import AiAnalysisRepository
 from infrastructure.repositories.retinal_image_repository import RetinalImageRepository
 from infrastructure.databases.mssql import session
@@ -35,12 +36,15 @@ def health_check():
 
 
 @ai_analysis_bp.route('', methods=['POST'])
+@require_roles(['Doctor', 'Admin'])
 def create_analysis():
     """
     Create a new AI analysis request
     ---
     tags:
       - AI Analysis
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -119,12 +123,15 @@ def create_analysis():
 
 
 @ai_analysis_bp.route('/<int:analysis_id>', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def get_analysis(analysis_id):
     """
     Get AI analysis by ID
     ---
     tags:
       - AI Analysis
+    security:
+      - Bearer: []
     parameters:
       - name: analysis_id
         in: path
@@ -151,12 +158,15 @@ def get_analysis(analysis_id):
 
 
 @ai_analysis_bp.route('/patient/<int:patient_id>', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def get_patient_analyses(patient_id):
     """
     Get analysis history for a patient with pagination (FR-17)
     ---
     tags:
       - AI Analysis
+    security:
+      - Bearer: []
     parameters:
       - name: patient_id
         in: path
@@ -275,12 +285,15 @@ def get_patient_analyses(patient_id):
 
 
 @ai_analysis_bp.route('/image/<int:image_id>', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def get_analysis_by_image(image_id):
     """
     Get AI analysis for a specific image
     ---
     tags:
       - AI Analysis
+    security:
+      - Bearer: []
     parameters:
       - name: image_id
         in: path
@@ -307,12 +320,15 @@ def get_analysis_by_image(image_id):
 
 
 @ai_analysis_bp.route('/status/<status>', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_analyses_by_status(status):
     """
     Get analyses by status
     ---
     tags:
       - AI Analysis
+    security:
+      - Bearer: []
     parameters:
       - name: status
         in: path
@@ -343,12 +359,15 @@ def get_analyses_by_status(status):
 
 
 @ai_analysis_bp.route('/pending', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_pending_analyses():
     """
     Get pending analyses
     ---
     tags:
       - AI Analysis
+    security:
+      - Bearer: []
     responses:
       200:
         description: List of pending analyses
@@ -371,12 +390,15 @@ def get_pending_analyses():
 
 
 @ai_analysis_bp.route('/processing', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_processing_analyses():
     """
     Get analyses currently processing
     ---
     tags:
       - AI Analysis
+    security:
+      - Bearer: []
     responses:
       200:
         description: List of processing analyses
@@ -399,12 +421,15 @@ def get_processing_analyses():
 
 
 @ai_analysis_bp.route('/completed', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_completed_analyses():
     """
     Get completed analyses
     ---
     tags:
       - AI Analysis
+    security:
+      - Bearer: []
     responses:
       200:
         description: List of completed analyses
@@ -428,12 +453,15 @@ def get_completed_analyses():
 
 
 @ai_analysis_bp.route('/<int:analysis_id>/processing', methods=['PUT'])
+@require_role('Admin')
 def mark_as_processing(analysis_id):
     """
     Mark analysis as processing
     ---
     tags:
       - AI Analysis
+    security:
+      - Bearer: []
     parameters:
       - name: analysis_id
         in: path
@@ -463,12 +491,15 @@ def mark_as_processing(analysis_id):
 
 
 @ai_analysis_bp.route('/<int:analysis_id>/complete', methods=['PUT'])
+@require_role('Admin')
 def mark_as_completed(analysis_id):
     """
     Mark analysis as completed
     ---
     tags:
       - AI Analysis
+    security:
+      - Bearer: []
     parameters:
       - name: analysis_id
         in: path
@@ -532,12 +563,15 @@ def mark_as_completed(analysis_id):
 
 
 @ai_analysis_bp.route('/<int:analysis_id>/fail', methods=['PUT'])
+@require_role('Admin')
 def mark_as_failed(analysis_id):
     """
     Mark analysis as failed
     ---
     tags:
       - AI Analysis
+    security:
+      - Bearer: []
     parameters:
       - name: analysis_id
         in: path
@@ -567,12 +601,15 @@ def mark_as_failed(analysis_id):
 
 
 @ai_analysis_bp.route('/<int:analysis_id>', methods=['DELETE'])
+@require_roles(['Doctor', 'Admin'])
 def delete_analysis(analysis_id):
     """
     Delete AI analysis
     ---
     tags:
       - AI Analysis
+    security:
+      - Bearer: []
     parameters:
       - name: analysis_id
         in: path
@@ -599,12 +636,15 @@ def delete_analysis(analysis_id):
 
 
 @ai_analysis_bp.route('/stats', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_stats():
     """
     Get AI analysis statistics
     ---
     tags:
       - AI Analysis
+    security:
+      - Bearer: []
     parameters:
       - name: status
         in: query
@@ -646,12 +686,15 @@ def get_stats():
 
 
 @ai_analysis_bp.route('/failed', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_failed_analyses():
     """
     Get failed analyses
     ---
     tags:
       - AI Analysis
+    security:
+      - Bearer: []      
     responses:
       200:
         description: List of failed analyses
@@ -691,12 +734,15 @@ def get_failed_analyses():
 
 
 @ai_analysis_bp.route('/patient/<int:patient_id>/trend', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def get_patient_trend(patient_id):
     """
     Get trend data for a patient over time (FR-17)
     ---
     tags:
       - AI Analysis
+    security:
+      - Bearer: []
     parameters:
       - name: patient_id
         in: path

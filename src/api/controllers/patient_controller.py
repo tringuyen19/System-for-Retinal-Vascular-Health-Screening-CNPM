@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
+from api.middleware.auth_middleware import require_roles
 from infrastructure.repositories.patient_profile_repository import PatientProfileRepository
 from infrastructure.repositories.account_repository import AccountRepository
 from infrastructure.databases.mssql import session
@@ -36,12 +37,15 @@ def health_check():
 
 
 @patient_bp.route('', methods=['POST'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def create_patient():
     """
     Create a new patient profile
     ---
     tags:
       - Patient
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -123,12 +127,15 @@ def create_patient():
 
 
 @patient_bp.route('/<int:patient_id>', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def get_patient(patient_id):
     """
     Get patient by ID
     ---
     tags:
       - Patient
+    security:
+      - Bearer: []
     parameters:
       - name: patient_id
         in: path
@@ -156,12 +163,15 @@ def get_patient(patient_id):
 
 
 @patient_bp.route('/account/<int:account_id>', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def get_patient_by_account(account_id):
     """
     Get patient by account ID
     ---
     tags:
       - Patient
+    security:
+      - Bearer: []
     parameters:
       - name: account_id
         in: path
@@ -189,12 +199,15 @@ def get_patient_by_account(account_id):
 
 
 @patient_bp.route('/search', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def search_patients():
     """
     Search and filter patients (FR-18)
     ---
     tags:
       - Patient
+    security:
+      - Bearer: []
     parameters:
       - name: name
         in: query
@@ -250,12 +263,15 @@ def search_patients():
 
 
 @patient_bp.route('/assigned/clinic/<int:clinic_id>', methods=['GET'])
+@require_roles(['Doctor', 'Admin', 'ClinicManager'])
 def get_assigned_patients(clinic_id):
     """
     Get patients assigned to a clinic (FR-13)
     ---
     tags:
       - Patient
+    security:
+      - Bearer: []
     parameters:
       - name: clinic_id
         in: path
@@ -283,12 +299,15 @@ def get_assigned_patients(clinic_id):
 
 
 @patient_bp.route('', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_all_patients():
     """
     Get all patients
     ---
     tags:
       - Patient
+    security:
+      - Bearer: []
     responses:
       200:
         description: List of all patients
@@ -309,12 +328,15 @@ def get_all_patients():
 
 
 @patient_bp.route('/<int:patient_id>', methods=['PUT'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def update_patient(patient_id):
     """
     Update patient profile
     ---
     tags:
       - Patient
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -388,12 +410,15 @@ def update_patient(patient_id):
 
 
 @patient_bp.route('/<int:patient_id>/medical-history', methods=['PUT'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def update_medical_history(patient_id):
     """
     Update patient medical history
     ---
     tags:
       - Patient
+    security:
+      - Bearer: []
     parameters:
       - name: patient_id
         in: path
@@ -460,12 +485,15 @@ def update_medical_history(patient_id):
 
 
 @patient_bp.route('/<int:patient_id>', methods=['DELETE'])
+@require_roles(['Patient', 'Admin'])
 def delete_patient(patient_id):
     """
     Delete patient
     ---
     tags:
       - Patient
+    security:
+      - Bearer: []
     parameters:
       - name: patient_id
         in: path
@@ -493,12 +521,15 @@ def delete_patient(patient_id):
 
 
 @patient_bp.route('/stats', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_stats():
     """
     Get patient statistics
     ---
     tags:
       - Patient
+    security:
+      - Bearer: []
     responses:
       200:
         description: Patient statistics

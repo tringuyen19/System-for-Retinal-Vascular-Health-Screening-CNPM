@@ -95,7 +95,7 @@ class SwaggerConfig:
                 "type": "apiKey",
                 "name": "Authorization",
                 "in": "header",
-                "description": "JWT Authorization header using the Bearer scheme. Enter only the token value (without 'Bearer ' prefix). Swagger will automatically format it as 'Authorization: Bearer {token}'"
+                "description": "JWT Authorization header using the Bearer scheme. Enter only the token value (without 'Bearer ' prefix). The middleware will automatically add 'Bearer ' prefix if missing. Example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
             }
         }
     }

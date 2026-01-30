@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
+from api.middleware.auth_middleware import require_role, require_roles
 from infrastructure.repositories.clinic_repository import ClinicRepository
 from infrastructure.repositories.account_repository import AccountRepository
 from infrastructure.repositories.patient_profile_repository import PatientProfileRepository
@@ -254,12 +255,15 @@ def get_verified_clinics():
 
 
 @clinic_bp.route('/pending', methods=['GET'])
+@require_role('Admin')
 def get_pending_clinics():
     """
     Get clinics pending verification (Admin only)
     ---
     tags:
       - Clinic
+    security:
+      - Bearer: []
     responses:
       200:
         description: List of pending clinics
@@ -278,6 +282,7 @@ def get_pending_clinics():
 
 
 @clinic_bp.route('/<int:clinic_id>/verify', methods=['PUT'])
+@require_role('Admin')
 def verify_clinic(clinic_id):
     """
     Verify clinic (Admin only) - FR-22 Verification Workflow
@@ -287,6 +292,8 @@ def verify_clinic(clinic_id):
     ---
     tags:
       - Clinic
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -355,6 +362,7 @@ def verify_clinic(clinic_id):
 
 
 @clinic_bp.route('/<int:clinic_id>/reject', methods=['PUT'])
+@require_role('Admin')
 def reject_clinic(clinic_id):
     """
     Reject clinic verification (Admin only) - FR-22 Verification Workflow
@@ -365,6 +373,8 @@ def reject_clinic(clinic_id):
     ---
     tags:
       - Clinic
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -436,6 +446,7 @@ def reject_clinic(clinic_id):
 
 
 @clinic_bp.route('/<int:clinic_id>/approve', methods=['PUT'])
+@require_role('Admin')
 def approve_clinic(clinic_id):
     """
     Approve clinic registration (FR-38) - Admin only
@@ -445,6 +456,8 @@ def approve_clinic(clinic_id):
     ---
     tags:
       - Clinic
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -513,6 +526,7 @@ def approve_clinic(clinic_id):
 
 
 @clinic_bp.route('/<int:clinic_id>/suspend', methods=['PUT'])
+@require_role('Admin')
 def suspend_clinic(clinic_id):
     """
     Suspend clinic registration (FR-38) - Admin only
@@ -523,6 +537,8 @@ def suspend_clinic(clinic_id):
     ---
     tags:
       - Clinic
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -591,12 +607,15 @@ def suspend_clinic(clinic_id):
 
 
 @clinic_bp.route('/<int:clinic_id>', methods=['PUT'])
+@require_roles(['ClinicManager', 'Admin'])
 def update_clinic(clinic_id):
     """
     Update clinic information
     ---
     tags:
       - Clinic
+    security:
+      - Bearer: []
     parameters:
       - name: clinic_id
         in: path
@@ -667,12 +686,15 @@ def update_clinic(clinic_id):
 
 
 @clinic_bp.route('/<int:clinic_id>', methods=['DELETE'])
+@require_role('Admin')
 def delete_clinic(clinic_id):
     """
     Delete clinic
     ---
     tags:
       - Clinic
+    security:
+      - Bearer: []
     parameters:
       - name: clinic_id
         in: path
@@ -700,12 +722,15 @@ def delete_clinic(clinic_id):
 
 
 @clinic_bp.route('/stats', methods=['GET'])
+@require_role('Admin')
 def get_stats():
     """
     Get clinic statistics
     ---
     tags:
       - Clinic
+    security:
+      - Bearer: []
     parameters:
       - name: status
         in: query
@@ -779,12 +804,15 @@ def get_verification_status(clinic_id):
 
 
 @clinic_bp.route('/<int:clinic_id>/members', methods=['GET'])
+@require_roles(['ClinicManager', 'Admin'])
 def get_clinic_members(clinic_id):
     """
     Get all members (doctors and patients) in clinic (FR-23)
     ---
     tags:
       - Clinic
+    security:
+      - Bearer: []
     parameters:
       - name: clinic_id
         in: path
@@ -865,12 +893,15 @@ def get_clinic_members(clinic_id):
 
 
 @clinic_bp.route('/<int:clinic_id>/risk-aggregation', methods=['GET'])
+@require_roles(['ClinicManager', 'Admin', 'Doctor'])
 def get_clinic_risk_aggregation(clinic_id):
     """
     Get aggregated risk data for all patients in clinic (FR-25)
     ---
     tags:
       - Clinic
+    security:
+      - Bearer: []
     parameters:
       - name: clinic_id
         in: path
@@ -946,12 +977,15 @@ def get_clinic_risk_aggregation(clinic_id):
 
 
 @clinic_bp.route('/<int:clinic_id>/usage', methods=['GET'])
+@require_roles(['ClinicManager', 'Admin'])
 def get_clinic_usage(clinic_id):
     """
     Get clinic usage summary including images and package usage (FR-27)
     ---
     tags:
       - Clinic
+    security:
+      - Bearer: []
     parameters:
       - name: clinic_id
         in: path
@@ -1006,12 +1040,15 @@ def get_clinic_usage(clinic_id):
 
 
 @clinic_bp.route('/<int:clinic_id>/high-risk-alerts', methods=['GET'])
+@require_roles(['ClinicManager', 'Admin', 'Doctor'])
 def get_high_risk_alerts(clinic_id):
     """
     Get high-risk patient alerts for clinic (FR-29)
     ---
     tags:
       - Clinic
+    security:
+      - Bearer: []
     parameters:
       - name: clinic_id
         in: path
@@ -1100,12 +1137,15 @@ def get_high_risk_alerts(clinic_id):
 
 
 @clinic_bp.route('/<int:clinic_id>/abnormal-trends', methods=['GET'])
+@require_roles(['ClinicManager', 'Admin', 'Doctor'])
 def detect_abnormal_trends(clinic_id):
     """
     Detect abnormal trends in clinic patient data (FR-29)
     ---
     tags:
       - Clinic
+    security:
+      - Bearer: []
     parameters:
       - name: clinic_id
         in: path
@@ -1179,12 +1219,15 @@ def detect_abnormal_trends(clinic_id):
         return error_response(f'Internal server error: {str(e)}', 500)
 
 @clinic_bp.route('/<int:clinic_id>/reports-summary', methods=['GET'])
+@require_roles(['ClinicManager', 'Admin', 'Doctor'])
 def get_clinic_reports_summary(clinic_id):
     """
     Get summary of all reports for clinic patients (FR-25)
     ---
     tags:
       - Clinic
+    security:
+      - Bearer: []
     parameters:
       - name: clinic_id
         in: path
@@ -1263,12 +1306,15 @@ def get_clinic_reports_summary(clinic_id):
 
 
 @clinic_bp.route('/<int:clinic_id>/screening-report', methods=['GET'])
+@require_roles(['ClinicManager', 'Admin', 'Doctor'])
 def generate_clinic_screening_report(clinic_id):
     """
     Generate clinic-wide report for screening campaigns (FR-26)
     ---
     tags:
       - Clinic
+    security:
+      - Bearer: []
     parameters:
       - name: clinic_id
         in: path
@@ -1446,12 +1492,15 @@ def generate_clinic_screening_report(clinic_id):
 
 
 @clinic_bp.route('/<int:clinic_id>/export-statistics', methods=['GET'])
+@require_roles(['ClinicManager', 'Admin'])
 def export_clinic_statistics(clinic_id):
     """
     Export clinic statistics for clinical research or management (FR-30)
     ---
     tags:
       - Clinic
+    security:
+      - Bearer: []
     parameters:
       - name: clinic_id
         in: path

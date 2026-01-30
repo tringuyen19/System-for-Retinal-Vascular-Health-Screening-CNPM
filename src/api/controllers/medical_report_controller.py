@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, Response
 from marshmallow import ValidationError
+from api.middleware.auth_middleware import require_roles
 from infrastructure.repositories.medical_report_repository import MedicalReportRepository
 from infrastructure.repositories.patient_profile_repository import PatientProfileRepository
 from infrastructure.repositories.doctor_profile_repository import DoctorProfileRepository
@@ -53,12 +54,15 @@ def health_check():
 
 
 @medical_report_bp.route('', methods=['POST'])
+@require_roles(['Doctor', 'Admin'])
 def create_report():
     """
     Create a new medical report with automated recommendations (FR-16)
     ---
     tags:
       - Medical Report
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -146,12 +150,15 @@ def create_report():
 
 
 @medical_report_bp.route('/<int:report_id>', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def get_report(report_id):
     """
     Get medical report by ID
     ---
     tags:
       - Medical Report
+    security:
+      - Bearer: []
     parameters:
       - name: report_id
         in: path
@@ -178,12 +185,15 @@ def get_report(report_id):
 
 
 @medical_report_bp.route('/analysis/<int:analysis_id>', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def get_report_by_analysis(analysis_id):
     """
     Get report for a specific analysis
     ---
     tags:
       - Medical Report
+    security:
+      - Bearer: []
     parameters:
       - name: analysis_id
         in: path
@@ -210,12 +220,15 @@ def get_report_by_analysis(analysis_id):
 
 
 @medical_report_bp.route('/patient/<int:patient_id>', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def get_reports_by_patient(patient_id):
     """
     Get all reports for a patient
     ---
     tags:
       - Medical Report
+    security:
+      - Bearer: []
     parameters:
       - name: patient_id
         in: path
@@ -258,12 +271,15 @@ def get_reports_by_patient(patient_id):
 
 
 @medical_report_bp.route('/doctor/<int:doctor_id>', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_reports_by_doctor(doctor_id):
     """
     Get all reports created by a doctor
     ---
     tags:
       - Medical Report
+    security:
+      - Bearer: []
     parameters:
       - name: doctor_id
         in: path
@@ -295,12 +311,15 @@ def get_reports_by_doctor(doctor_id):
 
 
 @medical_report_bp.route('', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_all_reports():
     """
     Get all medical reports
     ---
     tags:
       - Medical Report
+    security:
+      - Bearer: []
     parameters:
       - name: start_date
         in: query
@@ -349,12 +368,15 @@ def get_all_reports():
 
 
 @medical_report_bp.route('/<int:report_id>/url', methods=['PUT'])
+@require_roles(['Doctor', 'Admin'])
 def update_report_url(report_id):
     """
     Update report URL (re-generate report)
     ---
     tags:
       - Medical Report
+    security:
+      - Bearer: []
     parameters:
       - name: report_id
         in: path
@@ -421,12 +443,15 @@ def update_report_url(report_id):
 
 
 @medical_report_bp.route('/<int:report_id>', methods=['DELETE'])
+@require_roles(['Doctor', 'Admin'])
 def delete_report(report_id):
     """
     Delete medical report
     ---
     tags:
       - Medical Report
+    security:
+      - Bearer: []
     parameters:
       - name: report_id
         in: path
@@ -454,12 +479,15 @@ def delete_report(report_id):
 
 
 @medical_report_bp.route('/stats', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_stats():
     """
     Get medical report statistics
     ---
     tags:
       - Medical Report
+    security:
+      - Bearer: []
     parameters:
       - name: patient_id
         in: query
@@ -502,12 +530,15 @@ def get_stats():
 
 
 @medical_report_bp.route('/<int:report_id>/export', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def export_report(report_id):
     """
     Export medical report as PDF or CSV
     ---
     tags:
       - Medical Report
+    security:
+      - Bearer: []
     parameters:
       - name: report_id
         in: path

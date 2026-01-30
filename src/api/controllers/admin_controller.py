@@ -5,6 +5,7 @@ Phase 4: Admin Requirements (FR-31 to FR-39)
 
 from flask import Blueprint, request
 from marshmallow import ValidationError
+from api.middleware.auth_middleware import require_role
 from infrastructure.repositories.account_repository import AccountRepository
 from infrastructure.repositories.clinic_repository import ClinicRepository
 from infrastructure.repositories.patient_profile_repository import PatientProfileRepository
@@ -74,6 +75,7 @@ def health_check():
 # ========== FR-35: Global Dashboard ==========
 
 @admin_bp.route('/dashboard', methods=['GET'])
+@require_role('Admin')
 def get_dashboard():
     """
     Get global dashboard summary (FR-35)
@@ -81,6 +83,8 @@ def get_dashboard():
     ---
     tags:
       - Admin
+    security:
+      - Bearer: []
     responses:
       200:
         description: Dashboard summary retrieved successfully
@@ -139,12 +143,15 @@ def get_dashboard():
 # ========== FR-36: System Analytics ==========
 
 @admin_bp.route('/analytics/images', methods=['GET'])
+@require_role('Admin')
 def get_image_analytics():
     """
     Get image analytics (FR-36)
     ---
     tags:
       - Admin
+    security:
+      - Bearer: []
     parameters:
       - name: days
         in: query
@@ -166,12 +173,15 @@ def get_image_analytics():
 
 
 @admin_bp.route('/analytics/risk-distribution', methods=['GET'])
+@require_role('Admin')
 def get_risk_distribution_analytics():
     """
     Get risk distribution analytics (FR-36)
     ---
     tags:
       - Admin
+    security:
+      - Bearer: []
     responses:
       200:
         description: Risk distribution analytics retrieved successfully
@@ -184,12 +194,15 @@ def get_risk_distribution_analytics():
 
 
 @admin_bp.route('/analytics/revenue', methods=['GET'])
+@require_role('Admin')
 def get_revenue_analytics():
     """
     Get revenue analytics (FR-36)
     ---
     tags:
       - Admin
+    security:
+      - Bearer: []
     parameters:
       - name: days
         in: query
@@ -217,12 +230,15 @@ def get_revenue_analytics():
 
 
 @admin_bp.route('/analytics/error-rates', methods=['GET'])
+@require_role('Admin')
 def get_error_rate_analytics():
     """
     Get error rate analytics (FR-36)
     ---
     tags:
       - Admin
+    security:
+      - Bearer: []
     responses:
       200:
         description: Error rate analytics retrieved successfully
@@ -237,6 +253,7 @@ def get_error_rate_analytics():
 # ========== FR-33: AI Configuration ==========
 
 @admin_bp.route('/ai-config', methods=['GET'])
+@require_role('Admin')
 def get_ai_configuration():
     """
     Get AI configuration (FR-33)
@@ -244,6 +261,8 @@ def get_ai_configuration():
     ---
     tags:
       - Admin
+    security:
+      - Bearer: []
     responses:
       200:
         description: AI configuration retrieved successfully
@@ -256,6 +275,7 @@ def get_ai_configuration():
 
 
 @admin_bp.route('/ai-config', methods=['PUT'])
+@require_role('Admin')
 def update_ai_configuration():
     """
     Update AI configuration (FR-33)
@@ -263,6 +283,8 @@ def update_ai_configuration():
     ---
     tags:
       - Admin
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -316,12 +338,15 @@ def update_ai_configuration():
 # ========== FR-37: Privacy Settings Management ==========
 
 @admin_bp.route('/privacy-settings', methods=['GET'])
+@require_role('Admin')
 def get_privacy_settings():
     """
     Get privacy settings (FR-37)
     ---
     tags:
       - Admin
+    security:
+      - Bearer: []
     responses:
       200:
         description: Privacy settings retrieved successfully
@@ -335,12 +360,15 @@ def get_privacy_settings():
 
 
 @admin_bp.route('/privacy-settings', methods=['PUT'])
+@require_role('Admin')
 def update_privacy_settings():
     """
     Update privacy settings (FR-37)
     ---
     tags:
       - Admin
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -395,12 +423,15 @@ def update_privacy_settings():
 # ========== FR-39: Communication Policies Management ==========
 
 @admin_bp.route('/communication-policies', methods=['GET'])
+@require_role('Admin')
 def get_communication_policies():
     """
     Get all communication policies (FR-39)
     ---
     tags:
       - Admin
+    security:
+      - Bearer: []
     responses:
       200:
         description: Communication policies retrieved successfully
@@ -415,12 +446,15 @@ def get_communication_policies():
 
 
 @admin_bp.route('/communication-policies/<notification_type>', methods=['GET'])
+@require_role('Admin')
 def get_communication_policy(notification_type):
     """
     Get communication policy for a notification type (FR-39)
     ---
     tags:
       - Admin
+    security:
+      - Bearer: []
     parameters:
       - name: notification_type
         in: path
@@ -448,12 +482,15 @@ def get_communication_policy(notification_type):
 
 
 @admin_bp.route('/communication-policies/<notification_type>', methods=['PUT'])
+@require_role('Admin')
 def update_communication_policy(notification_type):
     """
     Update communication policy for a notification type (FR-39)
     ---
     tags:
       - Admin
+    security:
+      - Bearer: []
     parameters:
       - name: notification_type
         in: path
@@ -510,12 +547,15 @@ def update_communication_policy(notification_type):
 
 
 @admin_bp.route('/communication-policies/<notification_type>', methods=['POST'])
+@require_role('Admin')
 def create_communication_policy(notification_type):
     """
     Create new communication policy for a notification type (FR-39)
     ---
     tags:
       - Admin
+    security:
+      - Bearer: []
     parameters:
       - name: notification_type
         in: path
