@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
+from api.middleware.auth_middleware import require_role
 from infrastructure.repositories.role_repository import RoleRepository
 from infrastructure.databases.mssql import session
 from services.role_service import RoleService
@@ -30,12 +31,15 @@ def health_check():
 
 
 @role_bp.route('', methods=['POST'])
+@require_role('Admin')
 def create_role():
     """
     Create a new role
     ---
     tags:
       - Role
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -120,12 +124,15 @@ def get_role(role_id):
 
 
 @role_bp.route('/name/<role_name>', methods=['GET'])
+@require_role('Admin')
 def get_role_by_name(role_name):
     """
     Get role by name
     ---
     tags:
       - Role
+    security:
+      - Bearer: []
     parameters:
       - name: role_name
         in: path
@@ -153,12 +160,15 @@ def get_role_by_name(role_name):
 
 
 @role_bp.route('', methods=['GET'])
+@require_role('Admin')
 def get_all_roles():
     """
     Get all roles
     ---
     tags:
       - Role
+    security:
+      - Bearer: []
     responses:
       200:
         description: List of all roles
@@ -179,12 +189,15 @@ def get_all_roles():
 
 
 @role_bp.route('/<int:role_id>', methods=['PUT'])
+@require_role('Admin')
 def update_role(role_id):
     """
     Update role name
     ---
     tags:
       - Role
+    security:
+      - Bearer: []
     parameters:
       - name: role_id
         in: path
@@ -250,12 +263,15 @@ def update_role(role_id):
 
 
 @role_bp.route('/<int:role_id>', methods=['DELETE'])
+@require_role('Admin')
 def delete_role(role_id):
     """
     Delete role
     ---
     tags:
       - Role
+    security:
+      - Bearer: []
     parameters:
       - name: role_id
         in: path
@@ -339,12 +355,15 @@ def check_role_exists():
 
 
 @role_bp.route('/stats', methods=['GET'])
+@require_role('Admin')
 def get_stats():
     """
     Get role statistics
     ---
     tags:
       - Role
+    security:
+      - Bearer: []
     responses:
       200:
         description: Role statistics

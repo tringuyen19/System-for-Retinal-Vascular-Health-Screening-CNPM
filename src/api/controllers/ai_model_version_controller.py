@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
+from api.middleware.auth_middleware import require_roles, require_role
 from infrastructure.repositories.ai_model_version_repository import AiModelVersionRepository
 from infrastructure.databases.mssql import session
 from services.ai_model_version_service import AiModelVersionService
@@ -31,12 +32,15 @@ def health_check():
 
 
 @ai_model_version_bp.route('', methods=['POST'])
+@require_role('Admin')
 def create_model_version():
     """
     Create a new AI model version
     ---
     tags:
       - AI Model Version
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -107,12 +111,15 @@ def create_model_version():
 
 
 @ai_model_version_bp.route('/<int:model_version_id>', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_model_version(model_version_id):
     """
     Get model version by ID
     ---
     tags:
       - AI Model Version
+    security:
+      - Bearer: []
     parameters:
       - name: model_version_id
         in: path
@@ -138,12 +145,15 @@ def get_model_version(model_version_id):
 
 
 @ai_model_version_bp.route('/model/<model_name>', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_versions_by_name(model_name):
     """
     Get all versions of a model
     ---
     tags:
       - AI Model Version
+    security:
+      - Bearer: []
     parameters:
       - name: model_name
         in: path
@@ -168,12 +178,15 @@ def get_versions_by_name(model_name):
 
 
 @ai_model_version_bp.route('/active', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_active_models():
     """
     Get all active AI model versions
     ---
     tags:
       - AI Model Version
+    security:
+      - Bearer: []
     responses:
       200:
         description: List of active models
@@ -196,12 +209,15 @@ def get_active_models():
 
 
 @ai_model_version_bp.route('/latest', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_latest_active():
     """
     Get latest active model version
     ---
     tags:
       - AI Model Version
+    security:
+      - Bearer: []
     parameters:
       - name: model_name
         in: query
@@ -263,12 +279,15 @@ def get_all_models():
 
 
 @ai_model_version_bp.route('/<int:model_version_id>/activate', methods=['PUT'])
+@require_role('Admin')
 def activate_model(model_version_id):
     """
     Activate model version
     ---
     tags:
       - AI Model Version
+    security:
+      - Bearer: []
     parameters:
       - name: model_version_id
         in: path
@@ -298,12 +317,15 @@ def activate_model(model_version_id):
 
 
 @ai_model_version_bp.route('/<int:model_version_id>/deactivate', methods=['PUT'])
+@require_role('Admin')
 def deactivate_model(model_version_id):
     """
     Deactivate model version
     ---
     tags:
       - AI Model Version
+    security:
+      - Bearer: []
     parameters:
       - name: model_version_id
         in: path
@@ -333,12 +355,15 @@ def deactivate_model(model_version_id):
 
 
 @ai_model_version_bp.route('/<int:model_version_id>/threshold', methods=['PUT'])
+@require_role('Admin')
 def update_threshold(model_version_id):
     """
     Update threshold configuration
     ---
     tags:
       - AI Model Version
+    security:
+      - Bearer: []
     parameters:
       - name: model_version_id
         in: path
@@ -404,12 +429,15 @@ def update_threshold(model_version_id):
 
 
 @ai_model_version_bp.route('/<int:model_version_id>', methods=['DELETE'])
+@require_role('Admin')
 def delete_model(model_version_id):
     """
     Delete model version
     ---
     tags:
       - AI Model Version
+    security:
+      - Bearer: []
     parameters:
       - name: model_version_id
         in: path
@@ -436,12 +464,15 @@ def delete_model(model_version_id):
 
 
 @ai_model_version_bp.route('/stats', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_stats():
     """
     Get model version statistics
     ---
     tags:
       - AI Model Version
+    security:
+      - Bearer: []
     responses:
       200:
         description: Model statistics

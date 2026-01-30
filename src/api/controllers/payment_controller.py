@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
+from api.middleware.auth_middleware import require_roles, require_role
 from infrastructure.repositories.payment_repository import PaymentRepository
 from infrastructure.repositories.subscription_repository import SubscriptionRepository
 from infrastructure.repositories.account_repository import AccountRepository
@@ -119,12 +120,15 @@ def create_payment():
 
 
 @payment_bp.route('/<int:payment_id>', methods=['GET'])
+@require_roles(['Patient', 'Admin'])
 def get_payment(payment_id):
     """
     Get payment by ID
     ---
     tags:
       - Payment
+    security:
+      - Bearer: []
     parameters:
       - name: payment_id
         in: path
@@ -186,12 +190,15 @@ def get_payments_by_subscription(subscription_id):
 
 
 @payment_bp.route('/account/<int:account_id>/history', methods=['GET'])
+@require_roles(['Patient', 'Admin'])
 def get_payment_history(account_id):
     """
     Get payment history for an account with pagination (FR-12)
     ---
     tags:
       - Payment
+    security:
+      - Bearer: []
     parameters:
       - name: account_id
         in: path
@@ -291,12 +298,15 @@ def get_payment_history(account_id):
 
 
 @payment_bp.route('/status/<status>', methods=['GET'])
+@require_role('Admin')
 def get_payments_by_status(status):
     """
     Get payments by status
     ---
     tags:
       - Payment
+    security:
+      - Bearer: []
     parameters:
       - name: status
         in: path
@@ -357,12 +367,15 @@ def get_pending_payments():
 
 
 @payment_bp.route('/completed', methods=['GET'])
+@require_role('Admin')
 def get_completed_payments():
     """
     Get all completed payments
     ---
     tags:
       - Payment
+    security:
+      - Bearer: []
     responses:
       200:
         description: List of completed payments
@@ -451,12 +464,15 @@ def get_payments_by_method(payment_method):
 
 
 @payment_bp.route('', methods=['GET'])
+@require_role('Admin')
 def get_all_payments():
     """
     Get all payments
     ---
     tags:
       - Payment
+    security:
+      - Bearer: []
     parameters:
       - name: start_date
         in: query
@@ -504,12 +520,15 @@ def get_all_payments():
 
 
 @payment_bp.route('/<int:payment_id>/complete', methods=['PUT'])
+@require_role('Admin')
 def mark_as_completed(payment_id):
     """
     Mark payment as completed
     ---
     tags:
       - Payment
+    security:
+      - Bearer: []
     parameters:
       - name: payment_id
         in: path
@@ -574,12 +593,15 @@ def mark_as_failed(payment_id):
 
 
 @payment_bp.route('/<int:payment_id>/refund', methods=['PUT'])
+@require_role('Admin')
 def mark_as_refunded(payment_id):
     """
     Mark payment as refunded
     ---
     tags:
       - Payment
+    security:
+      - Bearer: []
     parameters:
       - name: payment_id
         in: path
@@ -609,12 +631,15 @@ def mark_as_refunded(payment_id):
 
 
 @payment_bp.route('/<int:payment_id>', methods=['DELETE'])
+@require_role('Admin')
 def delete_payment(payment_id):
     """
     Delete payment
     ---
     tags:
       - Payment
+    security:
+      - Bearer: []
     parameters:
       - name: payment_id
         in: path
@@ -697,12 +722,15 @@ def get_stats():
 
 
 @payment_bp.route('/revenue', methods=['GET'])
+@require_role('Admin')
 def get_revenue():
     """
     Get revenue statistics
     ---
     tags:
       - Payment
+    security:
+      - Bearer: []
     parameters:
       - name: start_date
         in: query

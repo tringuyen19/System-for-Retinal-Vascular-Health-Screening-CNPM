@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
+from api.middleware.auth_middleware import require_roles, require_role
 from infrastructure.repositories.ai_annotation_repository import AiAnnotationRepository
 from infrastructure.repositories.ai_analysis_repository import AiAnalysisRepository
 from infrastructure.databases.mssql import session
@@ -103,12 +104,15 @@ def create_annotation():
 
 
 @ai_annotation_bp.route('/<int:annotation_id>', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def get_annotation(annotation_id):
     """
     Get annotation by ID
     ---
     tags:
       - AI Annotation
+    security:
+      - Bearer: []
     parameters:
       - name: annotation_id
         in: path
@@ -165,12 +169,15 @@ def get_annotation_by_analysis(analysis_id):
 
 
 @ai_annotation_bp.route('', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_all_annotations():
     """
     Get all annotations
     ---
     tags:
       - AI Annotation
+    security:
+      - Bearer: []
     responses:
       200:
         description: List of all annotations
@@ -256,12 +263,15 @@ def update_annotation(annotation_id):
 
 
 @ai_annotation_bp.route('/<int:annotation_id>/heatmap', methods=['PUT'])
+@require_role('Admin')
 def update_heatmap(annotation_id):
     """
     Update heatmap URL
     ---
     tags:
       - AI Annotation
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -386,12 +396,15 @@ def update_description(annotation_id):
 
 
 @ai_annotation_bp.route('/<int:annotation_id>', methods=['DELETE'])
+@require_role('Admin')
 def delete_annotation(annotation_id):
     """
     Delete annotation
     ---
     tags:
       - AI Annotation
+    security:
+      - Bearer: []
     parameters:
       - name: annotation_id
         in: path
@@ -418,12 +431,15 @@ def delete_annotation(annotation_id):
 
 
 @ai_annotation_bp.route('/stats', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_stats():
     """
     Get annotation statistics
     ---
     tags:
       - AI Annotation
+    security:
+      - Bearer: []
     responses:
       200:
         description: Annotation statistics

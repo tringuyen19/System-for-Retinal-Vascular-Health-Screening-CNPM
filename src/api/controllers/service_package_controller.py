@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
+from api.middleware.auth_middleware import require_roles, require_role
 from infrastructure.repositories.service_package_repository import ServicePackageRepository
 from infrastructure.databases.mssql import session
 from services.service_package_service import ServicePackageService
@@ -30,12 +31,15 @@ def health_check():
 
 
 @service_package_bp.route('', methods=['POST'])
+@require_role('Admin')
 def create_package():
     """
     Create a new service package
     ---
     tags:
       - Service Package
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -267,12 +271,15 @@ def get_most_expensive():
 
 
 @service_package_bp.route('/<int:package_id>', methods=['PUT'])
+@require_role('Admin')
 def update_package(package_id):
     """
     Update package
     ---
     tags:
       - Service Package
+    security:
+      - Bearer: []
     parameters:
       - name: package_id
         in: path
@@ -351,12 +358,15 @@ def update_package(package_id):
 
 
 @service_package_bp.route('/<int:package_id>/price', methods=['PUT'])
+@require_role('Admin')
 def update_price(package_id):
     """
     Update package price
     ---
     tags:
       - Service Package
+    security:
+      - Bearer: []
     parameters:
       - name: package_id
         in: path
@@ -423,12 +433,15 @@ def update_price(package_id):
 
 
 @service_package_bp.route('/<int:package_id>', methods=['DELETE'])
+@require_role('Admin')
 def delete_package(package_id):
     """
     Delete package
     ---
     tags:
       - Service Package
+    security:
+      - Bearer: []
     parameters:
       - name: package_id
         in: path
@@ -455,12 +468,15 @@ def delete_package(package_id):
 
 
 @service_package_bp.route('/stats', methods=['GET'])
+@require_roles(['Admin', 'ClinicManager'])
 def get_stats():
     """
     Get package statistics
     ---
     tags:
       - Service Package
+    security:
+      - Bearer: []
     responses:
       200:
         description: Package statistics

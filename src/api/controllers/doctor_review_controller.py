@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
+from api.middleware.auth_middleware import require_roles, require_role
 from infrastructure.repositories.doctor_review_repository import DoctorReviewRepository
 from infrastructure.repositories.ai_analysis_repository import AiAnalysisRepository
 from infrastructure.repositories.doctor_profile_repository import DoctorProfileRepository
@@ -39,12 +40,15 @@ def health_check():
 
 
 @doctor_review_bp.route('', methods=['POST'])
+@require_roles(['Doctor', 'Admin'])
 def create_review():
     """
     Create a new doctor review for AI analysis
     ---
     tags:
       - Doctor Review
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -122,12 +126,15 @@ def create_review():
 
 
 @doctor_review_bp.route('/<int:review_id>', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_review(review_id):
     """
     Get review by ID
     ---
     tags:
       - Doctor Review
+    security:
+      - Bearer: []
     parameters:
       - name: review_id
         in: path
@@ -153,12 +160,15 @@ def get_review(review_id):
 
 
 @doctor_review_bp.route('/analysis/<int:analysis_id>', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_review_by_analysis(analysis_id):
     """
     Get review for a specific analysis
     ---
     tags:
       - Doctor Review
+    security:
+      - Bearer: []
     parameters:
       - name: analysis_id
         in: path
@@ -184,12 +194,15 @@ def get_review_by_analysis(analysis_id):
 
 
 @doctor_review_bp.route('/doctor/<int:doctor_id>', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_reviews_by_doctor(doctor_id):
     """
     Get all reviews by a doctor
     ---
     tags:
       - Doctor Review
+    security:
+      - Bearer: []
     parameters:
       - name: doctor_id
         in: path
@@ -219,12 +232,15 @@ def get_reviews_by_doctor(doctor_id):
 
 
 @doctor_review_bp.route('/status/<status>', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_reviews_by_status(status):
     """
     Get reviews by validation status
     ---
     tags:
       - Doctor Review
+    security:
+      - Bearer: []
     parameters:
       - name: status
         in: path
@@ -283,12 +299,15 @@ def get_pending_reviews():
 
 
 @doctor_review_bp.route('/<int:review_id>/approve', methods=['PUT'])
+@require_roles(['Doctor', 'Admin'])
 def approve_review(review_id):
     """
     Approve AI analysis result
     ---
     tags:
       - Doctor Review
+    security:
+      - Bearer: []
     parameters:
       - name: review_id
         in: path
@@ -384,12 +403,15 @@ def reject_review(review_id):
 
 
 @doctor_review_bp.route('/<int:review_id>/comment', methods=['PUT'])
+@require_roles(['Doctor', 'Admin'])
 def update_comment(review_id):
     """
     Update review comment
     ---
     tags:
       - Doctor Review
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -481,12 +503,15 @@ def delete_review(review_id):
 
 
 @doctor_review_bp.route('/stats', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_stats():
     """
     Get review statistics
     ---
     tags:
       - Doctor Review
+    security:
+      - Bearer: []
     parameters:
       - name: doctor_id
         in: query
@@ -531,12 +556,15 @@ def get_stats():
 
 
 @doctor_review_bp.route('/feedback/aggregation', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_feedback_aggregation():
     """
     Get aggregated feedback for AI improvement (FR-19)
     ---
     tags:
       - Doctor Review
+    security:
+      - Bearer: []
     parameters:
       - name: doctor_id
         in: query

@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
+from api.middleware.auth_middleware import require_roles
 from infrastructure.repositories.message_repository import MessageRepository
 from infrastructure.repositories.conversation_repository import ConversationRepository
 from infrastructure.databases.mssql import session
@@ -34,12 +35,15 @@ def health_check():
 
 
 @message_bp.route('', methods=['POST'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def create_message():
     """
     Send a new message
     ---
     tags:
       - Message
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -117,12 +121,15 @@ def create_message():
 
 
 @message_bp.route('/<int:message_id>', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def get_message(message_id):
     """
     Get message by ID
     ---
     tags:
       - Message
+    security:
+      - Bearer: []
     parameters:
       - name: message_id
         in: path
@@ -192,12 +199,15 @@ def get_messages_by_conversation(conversation_id):
 
 
 @message_bp.route('/conversation/<int:conversation_id>/recent', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def get_recent_messages(conversation_id):
     """
     Get recent messages in a conversation
     ---
     tags:
       - Message
+    security:
+      - Bearer: []
     parameters:
       - name: conversation_id
         in: path
@@ -232,12 +242,15 @@ def get_recent_messages(conversation_id):
 
 
 @message_bp.route('/conversation/<int:conversation_id>/last', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def get_last_message(conversation_id):
     """
     Get last message in a conversation
     ---
     tags:
       - Message
+    security:
+      - Bearer: []
     parameters:
       - name: conversation_id
         in: path
@@ -307,12 +320,15 @@ def get_messages_by_sender(conversation_id, sender_type):
 
 
 @message_bp.route('/conversation/<int:conversation_id>/search', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def search_messages(conversation_id):
     """
     Search messages in a conversation
     ---
     tags:
       - Message
+    security:
+      - Bearer: []
     parameters:
       - name: conversation_id
         in: path
@@ -348,12 +364,15 @@ def search_messages(conversation_id):
 
 
 @message_bp.route('/<int:message_id>', methods=['PUT'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def update_message(message_id):
     """
     Update message content
     ---
     tags:
       - Message
+    security:
+      - Bearer: []
     parameters:
       - name: message_id
         in: path
@@ -420,12 +439,15 @@ def update_message(message_id):
 
 
 @message_bp.route('/<int:message_id>', methods=['DELETE'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def delete_message(message_id):
     """
     Delete message
     ---
     tags:
       - Message
+    security:
+      - Bearer: []
     parameters:
       - name: message_id
         in: path
@@ -453,12 +475,15 @@ def delete_message(message_id):
 
 
 @message_bp.route('/conversation/<int:conversation_id>/delete-all', methods=['DELETE'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def delete_all_messages(conversation_id):
     """
     Delete all messages in a conversation
     ---
     tags:
       - Message
+    security:
+      - Bearer: []
     parameters:
       - name: conversation_id
         in: path
@@ -486,12 +511,15 @@ def delete_all_messages(conversation_id):
 
 
 @message_bp.route('/stats', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_stats():
     """
     Get message statistics
     ---
     tags:
       - Message
+    security:
+      - Bearer: []
     parameters:
       - name: conversation_id
         in: query

@@ -5,6 +5,7 @@ FR-39: Manage notification templates and communication policies
 
 from flask import Blueprint, request
 from marshmallow import ValidationError
+from api.middleware.auth_middleware import require_role
 from infrastructure.repositories.notification_template_repository import NotificationTemplateRepository
 from infrastructure.databases.mssql import session
 from services.notification_template_service import NotificationTemplateService
@@ -42,12 +43,15 @@ def health_check():
 # ========== FR-39: Notification Template Management ==========
 
 @notification_template_bp.route('', methods=['POST'])
+@require_role('Admin')
 def create_template():
     """
     Create notification template (FR-39)
     ---
     tags:
       - Notification Templates
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -112,12 +116,15 @@ def create_template():
 
 
 @notification_template_bp.route('', methods=['GET'])
+@require_role('Admin')
 def get_all_templates():
     """
     Get all notification templates (FR-39)
     ---
     tags:
       - Notification Templates
+    security:
+      - Bearer: []
     parameters:
       - name: include_inactive
         in: query
@@ -143,12 +150,15 @@ def get_all_templates():
 
 
 @notification_template_bp.route('/<int:template_id>', methods=['GET'])
+@require_role('Admin')
 def get_template(template_id):
     """
     Get notification template by ID (FR-39)
     ---
     tags:
       - Notification Templates
+    security:
+      - Bearer: []
     parameters:
       - name: template_id
         in: path
@@ -172,12 +182,15 @@ def get_template(template_id):
 
 
 @notification_template_bp.route('/type/<template_type>', methods=['GET'])
+@require_role('Admin')
 def get_templates_by_type(template_type):
     """
     Get notification templates by type (FR-39)
     ---
     tags:
       - Notification Templates
+    security:
+      - Bearer: []
     parameters:
       - name: template_type
         in: path
@@ -201,12 +214,15 @@ def get_templates_by_type(template_type):
 
 
 @notification_template_bp.route('/type/<template_type>/active', methods=['GET'])
+@require_role('Admin')
 def get_active_template_by_type(template_type):
     """
     Get active notification template by type (FR-39)
     ---
     tags:
       - Notification Templates
+    security:
+      - Bearer: []
     parameters:
       - name: template_type
         in: path
@@ -231,12 +247,15 @@ def get_active_template_by_type(template_type):
 
 
 @notification_template_bp.route('/<int:template_id>', methods=['PUT'])
+@require_role('Admin')
 def update_template(template_id):
     """
     Update notification template (FR-39)
     ---
     tags:
       - Notification Templates
+    security:
+      - Bearer: []
     parameters:
       - name: template_id
         in: path
@@ -321,12 +340,15 @@ def activate_template(template_id):
 
 
 @notification_template_bp.route('/<int:template_id>/deactivate', methods=['PUT'])
+@require_role('Admin')
 def deactivate_template(template_id):
     """
     Deactivate notification template (FR-39)
     ---
     tags:
       - Notification Templates
+    security:
+      - Bearer: []
     parameters:
       - name: template_id
         in: path
@@ -351,12 +373,15 @@ def deactivate_template(template_id):
 
 
 @notification_template_bp.route('/<int:template_id>', methods=['DELETE'])
+@require_role('Admin')
 def delete_template(template_id):
     """
     Delete notification template (FR-39)
     ---
     tags:
       - Notification Templates
+    security:
+      - Bearer: []
     parameters:
       - name: template_id
         in: path
@@ -379,12 +404,15 @@ def delete_template(template_id):
 
 
 @notification_template_bp.route('/<int:template_id>/render', methods=['POST'])
+@require_role('Admin')
 def render_template(template_id):
     """
     Render notification template with variables (FR-39)
     ---
     tags:
       - Notification Templates
+    security:
+      - Bearer: []
     parameters:
       - name: template_id
         in: path

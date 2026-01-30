@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
+from api.middleware.auth_middleware import require_roles, require_role
 from infrastructure.repositories.subscription_repository import SubscriptionRepository
 from infrastructure.repositories.account_repository import AccountRepository
 from infrastructure.repositories.service_package_repository import ServicePackageRepository
@@ -39,12 +40,15 @@ def health_check():
 
 
 @subscription_bp.route('', methods=['POST'])
+@require_roles(['Patient', 'Doctor', 'Admin', 'ClinicManager'])
 def create_subscription():
     """
     Create a new subscription
     ---
     tags:
       - Subscription
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -148,12 +152,15 @@ def create_subscription():
 
 
 @subscription_bp.route('/<int:subscription_id>', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin', 'ClinicManager'])
 def get_subscription(subscription_id):
     """
     Get subscription by ID
     ---
     tags:
       - Subscription
+    security:
+      - Bearer: []
     parameters:
       - name: subscription_id
         in: path
@@ -179,12 +186,15 @@ def get_subscription(subscription_id):
 
 
 @subscription_bp.route('/account/<int:account_id>', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def get_subscriptions_by_account(account_id):
     """
     Get all subscriptions for an account
     ---
     tags:
       - Subscription
+    security:
+      - Bearer: []
     parameters:
       - name: account_id
         in: path
@@ -209,12 +219,15 @@ def get_subscriptions_by_account(account_id):
 
 
 @subscription_bp.route('/account/<int:account_id>/active', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def get_active_subscription(account_id):
     """
     Get active subscription for an account
     ---
     tags:
       - Subscription
+    security:
+      - Bearer: []
     parameters:
       - name: account_id
         in: path
@@ -240,12 +253,15 @@ def get_active_subscription(account_id):
 
 
 @subscription_bp.route('/account/<int:account_id>/credits', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin', 'ClinicManager'])
 def get_account_credits(account_id):
     """
     Get remaining credits for an account (FR-12)
     ---
     tags:
       - Subscription
+    security:
+      - Bearer: []
     parameters:
       - name: account_id
         in: path
@@ -301,12 +317,15 @@ def get_account_credits(account_id):
 
 
 @subscription_bp.route('/status/<status>', methods=['GET'])
+@require_roles(['Admin', 'ClinicManager'])
 def get_subscriptions_by_status(status):
     """
     Get subscriptions by status
     ---
     tags:
       - Subscription
+    security:
+      - Bearer: []
     parameters:
       - name: status
         in: path
@@ -375,12 +394,15 @@ def get_expiring_soon():
 
 
 @subscription_bp.route('/<int:subscription_id>/deduct-credit', methods=['PUT'])
+@require_role('Admin')
 def deduct_credit(subscription_id):
     """
     Deduct credits from subscription
     ---
     tags:
       - Subscription
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -440,12 +462,15 @@ def deduct_credit(subscription_id):
 
 
 @subscription_bp.route('/<int:subscription_id>/add-credit', methods=['PUT'])
+@require_roles(['Admin', 'ClinicManager'])
 def add_credit(subscription_id):
     """
     Add credits to subscription
     ---
     tags:
       - Subscription
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -558,12 +583,15 @@ def cancel_subscription(subscription_id):
 
 
 @subscription_bp.route('/<int:subscription_id>/renew', methods=['PUT'])
+@require_roles(['Patient', 'Admin', 'ClinicManager'])
 def renew_subscription(subscription_id):
     """
     Renew subscription
     ---
     tags:
       - Subscription
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -668,12 +696,15 @@ def delete_subscription(subscription_id):
 
 
 @subscription_bp.route('/stats', methods=['GET'])
+@require_roles(['Admin', 'ClinicManager'])
 def get_stats():
     """
     Get subscription statistics
     ---
     tags:
       - Subscription
+    security:
+      - Bearer: []
     parameters:
       - name: status
         in: query

@@ -5,6 +5,7 @@ FR-37: Handle data compliance, audit logs, and privacy settings
 
 from flask import Blueprint, request
 from marshmallow import ValidationError
+from api.middleware.auth_middleware import require_role
 from infrastructure.repositories.audit_log_repository import AuditLogRepository
 from infrastructure.databases.mssql import session
 from services.audit_log_service import AuditLogService
@@ -38,12 +39,15 @@ def health_check():
 # ========== FR-37: Audit Log Management ==========
 
 @audit_log_bp.route('', methods=['POST'])
+@require_role('Admin')
 def create_audit_log():
     """
     Create audit log entry (FR-37)
     ---
     tags:
       - Audit Log
+    security:
+      - Bearer: []
     consumes:
       - application/json
     produces:
@@ -127,12 +131,15 @@ def create_audit_log():
 
 
 @audit_log_bp.route('/<int:audit_log_id>', methods=['GET'])
+@require_role('Admin')
 def get_audit_log(audit_log_id):
     """
     Get audit log by ID (FR-37)
     ---
     tags:
       - Audit Log
+    security:
+      - Bearer: []
     parameters:
       - name: audit_log_id
         in: path
@@ -278,12 +285,15 @@ def get_audit_logs():
 
 
 @audit_log_bp.route('/stats', methods=['GET'])
+@require_role('Admin')
 def get_audit_statistics():
     """
     Get audit log statistics (FR-37)
     ---
     tags:
       - Audit Log
+    security:
+      - Bearer: []
     responses:
       200:
         description: Audit log statistics retrieved successfully
@@ -296,12 +306,15 @@ def get_audit_statistics():
 
 
 @audit_log_bp.route('/by-account/<int:account_id>', methods=['GET'])
+@require_role('Admin')
 def get_logs_by_account(account_id):
     """
     Get audit logs by account ID (FR-37)
     ---
     tags:
       - Audit Log
+    security:
+      - Bearer: []
     parameters:
       - name: account_id
         in: path
@@ -341,12 +354,15 @@ def get_logs_by_account(account_id):
 
 
 @audit_log_bp.route('/by-action/<action_type>', methods=['GET'])
+@require_role('Admin')
 def get_logs_by_action(action_type):
     """
     Get audit logs by action type (FR-37)
     ---
     tags:
       - Audit Log
+    security:
+      - Bearer: []
     parameters:
       - name: action_type
         in: path
@@ -387,12 +403,15 @@ def get_logs_by_action(action_type):
 
 
 @audit_log_bp.route('/by-entity/<entity_type>/<int:entity_id>', methods=['GET'])
+@require_role('Admin')
 def get_logs_by_entity(entity_type, entity_id):
     """
     Get audit logs for a specific entity (FR-37)
     ---
     tags:
       - Audit Log
+    security:
+      - Bearer: []
     parameters:
       - name: entity_type
         in: path

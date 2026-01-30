@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
+from api.middleware.auth_middleware import require_roles, require_role
 from infrastructure.repositories.ai_result_repository import AiResultRepository
 from infrastructure.repositories.ai_analysis_repository import AiAnalysisRepository
 from infrastructure.repositories.notification_repository import NotificationRepository
@@ -120,12 +121,15 @@ def create_result():
 
 
 @ai_result_bp.route('/<int:result_id>', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def get_result(result_id):
     """
     Get result by ID
     ---
     tags:
       - AI Result
+    security:
+      - Bearer: []
     parameters:
       - name: result_id
         in: path
@@ -224,12 +228,15 @@ def get_results_by_analysis(analysis_id):
 
 
 @ai_result_bp.route('/disease/<disease_type>', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_results_by_disease(disease_type):
     """
     Get results by disease type
     ---
     tags:
       - AI Result
+    security:
+      - Bearer: []
     parameters:
       - name: disease_type
         in: path
@@ -295,12 +302,15 @@ def get_results_by_risk(risk_level):
 
 
 @ai_result_bp.route('/high-confidence', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_high_confidence_results():
     """
     Get high confidence results
     ---
     tags:
       - AI Result
+    security:
+      - Bearer: []
     parameters:
       - name: threshold
         in: query
@@ -335,12 +345,15 @@ def get_high_confidence_results():
 
 
 @ai_result_bp.route('', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_all_results():
     """
     Get all results
     ---
     tags:
       - AI Result
+    security:
+      - Bearer: []
     responses:
       200:
         description: List of all results
@@ -363,12 +376,15 @@ def get_all_results():
 
 
 @ai_result_bp.route('/<int:result_id>', methods=['PUT'])
+@require_role('Admin')
 def update_result(result_id):
     """
     Update result
     ---
     tags:
       - AI Result
+    security:
+      - Bearer: []
     parameters:
       - name: result_id
         in: path
@@ -437,12 +453,15 @@ def update_result(result_id):
 
 
 @ai_result_bp.route('/<int:result_id>', methods=['DELETE'])
+@require_role('Admin')
 def delete_result(result_id):
     """
     Delete result
     ---
     tags:
       - AI Result
+    security:
+      - Bearer: []
     parameters:
       - name: result_id
         in: path
@@ -469,12 +488,15 @@ def delete_result(result_id):
 
 
 @ai_result_bp.route('/stats', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
 def get_stats():
     """
     Get result statistics
     ---
     tags:
       - AI Result
+    security:
+      - Bearer: []
     responses:
       200:
         description: Result statistics
