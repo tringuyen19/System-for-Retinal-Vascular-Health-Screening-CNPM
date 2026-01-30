@@ -245,7 +245,7 @@ def upload_bulk_images():
                         type: string
                       error:
                         type: string
-               batch_id:
+                batch_id:
                   type: string
                   example: "batch_abc123_1234567890"
                   description: Batch ID for tracking this upload
@@ -338,7 +338,7 @@ def upload_bulk_images():
         # If some images have errors but some are valid, proceed with valid ones
         # (Errors will be included in the final response from service)
         
-       # Get optional batch_id from request
+        # Get optional batch_id from request
         batch_id = data.get('batch_id')
         
         # Upload bulk images (only valid ones) with batch tracking

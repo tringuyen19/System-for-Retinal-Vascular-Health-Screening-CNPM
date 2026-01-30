@@ -694,7 +694,7 @@ def get_failed_analyses():
     tags:
       - AI Analysis
     security:
-      - Bearer: []      
+      - Bearer: []
     responses:
       200:
         description: List of failed analyses

@@ -304,7 +304,7 @@ def verify_clinic(clinic_id):
         required: true
         schema:
           type: integer
-           example: 1
+          example: 1
       - in: body
         name: body
         required: false
@@ -318,7 +318,7 @@ def verify_clinic(clinic_id):
     responses:
       200:
         description: Clinic verified successfully
-              schema:
+        schema:
           type: object
           properties:
             message:
@@ -340,11 +340,11 @@ def verify_clinic(clinic_id):
         description: Clinic not found
     """
     try:
-        from domain.exceptions import NotFoundException, ValidationException
+        from domain.exceptions import NotFoundException
         
         data = request.get_json() or {}
         admin_notes = data.get('admin_notes')
-
+        
         # Call SERVICE ✅
         clinic = clinic_service.verify_clinic(clinic_id, admin_notes=admin_notes)
         if not clinic:
@@ -352,7 +352,7 @@ def verify_clinic(clinic_id):
         
         schema = ClinicResponseSchema()
         return success_response(schema.dump(clinic), 'Clinic verified successfully')
-    
+        
     except NotFoundException as e:
         return not_found_response(str(e))
     except ValueError as e:
@@ -392,14 +392,14 @@ def reject_clinic(clinic_id):
         schema:
           type: object
           properties:
-            admin_notes:
+            rejection_reason:
               type: string
               example: "Invalid license number or missing required documents"
               description: Reason for rejection (recommended)
     responses:
       200:
         description: Clinic rejected successfully
-                schema:
+        schema:
           type: object
           properties:
             message:
@@ -425,7 +425,7 @@ def reject_clinic(clinic_id):
         
         data = request.get_json() or {}
         rejection_reason = data.get('rejection_reason')
-
+        
         # Call SERVICE ✅
         clinic = clinic_service.reject_clinic(clinic_id, rejection_reason=rejection_reason)
         if not clinic:
@@ -436,7 +436,7 @@ def reject_clinic(clinic_id):
             'clinic_name': clinic.clinic_name,
             'verification_status': clinic.verification_status
         }, 'Clinic verification rejected')
-
+        
     except NotFoundException as e:
         return not_found_response(str(e))
     except ValueError as e:
@@ -1217,6 +1217,7 @@ def detect_abnormal_trends(clinic_id):
         return error_response(str(e), 400)
     except Exception as e:
         return error_response(f'Internal server error: {str(e)}', 500)
+
 
 @clinic_bp.route('/<int:clinic_id>/reports-summary', methods=['GET'])
 @require_roles(['ClinicManager', 'Admin', 'Doctor'])
