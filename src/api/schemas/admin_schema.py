@@ -39,3 +39,50 @@ class AdminAnalyticsResponseSchema(Schema):
     risk_distribution = fields.Dict(required=False)
     error_rate = fields.Float(required=False)
 # Add other analytics fields as needed
+
+
+class PrivacySettingsUpdateRequestSchema(Schema):
+    """Schema for updating privacy settings (FR-37)"""
+    data_retention_days = fields.Int(required=False, validate=validate.Range(min=1, max=3650))
+    auto_anonymize_after_days = fields.Int(required=False, validate=validate.Range(min=1, max=3650))
+    require_consent_for_ai_training = fields.Bool(required=False)
+    allow_data_sharing = fields.Bool(required=False)
+    anonymize_patient_data = fields.Bool(required=False)
+    encrypt_sensitive_data = fields.Bool(required=False)
+    audit_data_access = fields.Bool(required=False)
+    gdpr_compliance_mode = fields.Bool(required=False)
+
+
+class PrivacySettingsResponseSchema(Schema):
+    """Schema for privacy settings response (FR-37)"""
+    data_retention_days = fields.Int(required=True)
+    auto_anonymize_after_days = fields.Int(required=True)
+    require_consent_for_ai_training = fields.Bool(required=True)
+    allow_data_sharing = fields.Bool(required=True)
+    anonymize_patient_data = fields.Bool(required=True)
+    encrypt_sensitive_data = fields.Bool(required=True)
+    audit_data_access = fields.Bool(required=True)
+    gdpr_compliance_mode = fields.Bool(required=True)
+
+
+class CommunicationPolicySchema(Schema):
+    """Schema for communication policy nested object (FR-39)"""
+    enabled = fields.Bool(required=True)
+    channels = fields.List(fields.Str(validate=validate.OneOf(['in_app', 'email', 'sms'])), required=True)
+    recipients = fields.List(fields.Str(validate=validate.OneOf(['patient', 'doctor', 'clinic_manager', 'admin'])), required=True)
+    frequency_limit = fields.Int(required=False, allow_none=True, validate=validate.Range(min=1))
+    priority = fields.Str(required=True, validate=validate.OneOf(['low', 'normal', 'high', 'urgent']))
+
+
+class CommunicationPolicyUpdateRequestSchema(Schema):
+    """Schema for updating communication policy (FR-39)"""
+    enabled = fields.Bool(required=False)
+    channels = fields.List(fields.Str(validate=validate.OneOf(['in_app', 'email', 'sms'])), required=False)
+    recipients = fields.List(fields.Str(validate=validate.OneOf(['patient', 'doctor', 'clinic_manager', 'admin'])), required=False)
+    frequency_limit = fields.Int(required=False, allow_none=True, validate=validate.Range(min=1))
+    priority = fields.Str(required=False, validate=validate.OneOf(['low', 'normal', 'high', 'urgent']))
+
+
+class CommunicationPoliciesResponseSchema(Schema):
+    """Schema for communication policies response (FR-39)"""
+    policies = fields.Dict(required=True)

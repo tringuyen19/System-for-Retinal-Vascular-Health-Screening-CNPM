@@ -130,7 +130,6 @@ def get_all_templates():
         description: Templates retrieved successfully
     """
     try:
-        # Default: include inactive templates for admin management
         include_inactive = request.args.get('include_inactive', 'true').lower() == 'true'
         templates = notification_template_service.get_all(include_inactive=include_inactive)
         

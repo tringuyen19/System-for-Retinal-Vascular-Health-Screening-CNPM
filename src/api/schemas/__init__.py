@@ -133,7 +133,12 @@ from .admin_schema import (
     AiConfigurationUpdateRequestSchema,
     RetrainingPolicySchema,
     AdminDashboardResponseSchema,
-    AdminAnalyticsResponseSchema
+    AdminAnalyticsResponseSchema,
+    PrivacySettingsUpdateRequestSchema,
+    PrivacySettingsResponseSchema,
+    CommunicationPolicySchema,
+    CommunicationPolicyUpdateRequestSchema,
+    CommunicationPoliciesResponseSchema
 )
 
 # Audit Log Schemas
@@ -218,6 +223,11 @@ __all__ = [
     'RetrainingPolicySchema',
     'AdminDashboardResponseSchema',
     'AdminAnalyticsResponseSchema',
+    'PrivacySettingsUpdateRequestSchema',
+    'PrivacySettingsResponseSchema',
+    'CommunicationPolicySchema',
+    'CommunicationPolicyUpdateRequestSchema',
+    'CommunicationPoliciesResponseSchema',
      
     # Audit Log
     'AuditLogCreateRequestSchema',

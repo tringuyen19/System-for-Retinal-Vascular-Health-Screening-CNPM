@@ -18,7 +18,15 @@ from infrastructure.repositories.ai_model_version_repository import AiModelVersi
 from infrastructure.databases.mssql import session
 from services.admin_service import AdminService
 from api.responses import success_response, error_response, validation_error_response
-from api.schemas import AdminDashboardResponseSchema, AdminAnalyticsResponseSchema, AiConfigurationUpdateRequestSchema
+from api.schemas import (
+    AdminDashboardResponseSchema, 
+    AdminAnalyticsResponseSchema, 
+    AiConfigurationUpdateRequestSchema,
+    PrivacySettingsUpdateRequestSchema,
+    PrivacySettingsResponseSchema,
+    CommunicationPolicyUpdateRequestSchema,
+    CommunicationPoliciesResponseSchema
+)
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
@@ -301,5 +309,266 @@ def update_ai_configuration():
         return validation_error_response(e.messages)
     except NotFoundException as e:
         return error_response(str(e), 404)
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+# ========== FR-37: Privacy Settings Management ==========
+
+@admin_bp.route('/privacy-settings', methods=['GET'])
+def get_privacy_settings():
+    """
+    Get privacy settings (FR-37)
+    ---
+    tags:
+      - Admin
+    responses:
+      200:
+        description: Privacy settings retrieved successfully
+    """
+    try:
+        settings = admin_service.get_privacy_settings()
+        schema = PrivacySettingsResponseSchema()
+        return success_response(schema.dump(settings), "Privacy settings retrieved successfully")
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/privacy-settings', methods=['PUT'])
+def update_privacy_settings():
+    """
+    Update privacy settings (FR-37)
+    ---
+    tags:
+      - Admin
+    consumes:
+      - application/json
+    produces:
+      - application/json
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          properties:
+            data_retention_days:
+              type: integer
+              example: 365
+            auto_anonymize_after_days:
+              type: integer
+              example: 730
+            require_consent_for_ai_training:
+              type: boolean
+            allow_data_sharing:
+              type: boolean
+            anonymize_patient_data:
+              type: boolean
+            encrypt_sensitive_data:
+              type: boolean
+            audit_data_access:
+              type: boolean
+            gdpr_compliance_mode:
+              type: boolean
+    responses:
+      200:
+        description: Privacy settings updated successfully
+      400:
+        description: Invalid input
+    """
+    try:
+        schema = PrivacySettingsUpdateRequestSchema()
+        data = schema.load(request.get_json())
+        
+        updated_settings = admin_service.update_privacy_settings(data)
+        response_schema = PrivacySettingsResponseSchema()
+        return success_response(response_schema.dump(updated_settings), 
+                               "Privacy settings updated successfully")
+    except ValidationError as e:
+        return validation_error_response(e.messages)
+    except ValueError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+# ========== FR-39: Communication Policies Management ==========
+
+@admin_bp.route('/communication-policies', methods=['GET'])
+def get_communication_policies():
+    """
+    Get all communication policies (FR-39)
+    ---
+    tags:
+      - Admin
+    responses:
+      200:
+        description: Communication policies retrieved successfully
+    """
+    try:
+        policies = admin_service.get_communication_policies()
+        schema = CommunicationPoliciesResponseSchema()
+        return success_response(schema.dump({'policies': policies}), 
+                               "Communication policies retrieved successfully")
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/communication-policies/<notification_type>', methods=['GET'])
+def get_communication_policy(notification_type):
+    """
+    Get communication policy for a notification type (FR-39)
+    ---
+    tags:
+      - Admin
+    parameters:
+      - name: notification_type
+        in: path
+        required: true
+        schema:
+          type: string
+          example: "ai_result_ready"
+    responses:
+      200:
+        description: Communication policy retrieved successfully
+      404:
+        description: Policy not found
+    """
+    try:
+        policy = admin_service.get_communication_policy_by_type(notification_type)
+        if not policy:
+            return error_response(f"Communication policy for {notification_type} not found", 404)
+        
+        from api.schemas.admin_schema import CommunicationPolicySchema
+        schema = CommunicationPolicySchema()
+        return success_response(schema.dump(policy), 
+                               "Communication policy retrieved successfully")
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/communication-policies/<notification_type>', methods=['PUT'])
+def update_communication_policy(notification_type):
+    """
+    Update communication policy for a notification type (FR-39)
+    ---
+    tags:
+      - Admin
+    parameters:
+      - name: notification_type
+        in: path
+        required: true
+        schema:
+          type: string
+          example: "ai_result_ready"
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            channels:
+              type: array
+              items:
+                type: string
+                enum: [in_app, email, sms]
+            recipients:
+              type: array
+              items:
+                type: string
+                enum: [patient, doctor, clinic_manager, admin]
+            frequency_limit:
+              type: integer
+            priority:
+              type: string
+              enum: [low, normal, high, urgent]
+    responses:
+      200:
+        description: Communication policy updated successfully
+      400:
+        description: Invalid input
+      404:
+        description: Policy not found
+    """
+    try:
+        schema = CommunicationPolicyUpdateRequestSchema()
+        data = schema.load(request.get_json())
+        
+        updated_policy = admin_service.update_communication_policy(notification_type, data)
+        from api.schemas.admin_schema import CommunicationPolicySchema
+        response_schema = CommunicationPolicySchema()
+        return success_response(response_schema.dump(updated_policy), 
+                               "Communication policy updated successfully")
+    except ValidationError as e:
+        return validation_error_response(e.messages)
+    except ValueError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/communication-policies/<notification_type>', methods=['POST'])
+def create_communication_policy(notification_type):
+    """
+    Create new communication policy for a notification type (FR-39)
+    ---
+    tags:
+      - Admin
+    parameters:
+      - name: notification_type
+        in: path
+        required: true
+        schema:
+          type: string
+          example: "subscription_expired"
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          required:
+            - enabled
+            - channels
+            - recipients
+            - priority
+          properties:
+            enabled:
+              type: boolean
+            channels:
+              type: array
+              items:
+                type: string
+                enum: [in_app, email, sms]
+            recipients:
+              type: array
+              items:
+                type: string
+                enum: [patient, doctor, clinic_manager, admin]
+            frequency_limit:
+              type: integer
+            priority:
+              type: string
+              enum: [low, normal, high, urgent]
+    responses:
+      201:
+        description: Communication policy created successfully
+      400:
+        description: Invalid input
+    """
+    try:
+        from api.schemas.admin_schema import CommunicationPolicySchema
+        schema = CommunicationPolicySchema()
+        data = schema.load(request.get_json())
+        
+        created_policy = admin_service.create_communication_policy(notification_type, data)
+        response_schema = CommunicationPolicySchema()
+        return success_response(response_schema.dump(created_policy), 
+                               "Communication policy created successfully", 201)
+    except ValidationError as e:
+        return validation_error_response(e.messages)
+    except ValueError as e:
+        return error_response(str(e), 400)
     except Exception as e:
         return error_response(f'Internal server error: {str(e)}', 500)

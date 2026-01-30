@@ -57,6 +57,50 @@ class AdminService:
             'max_error_rate_threshold': 0.15  # 15% error rate triggers retrain
         }
 
+     # Privacy settings storage (in-memory, can be persisted to file/DB later) - FR-37
+        self._privacy_settings = {
+            'data_retention_days': 365,  # Days to retain data
+            'auto_anonymize_after_days': 730,  # Auto anonymize after 2 years
+            'require_consent_for_ai_training': True,
+            'allow_data_sharing': False,
+            'anonymize_patient_data': True,
+            'encrypt_sensitive_data': True,
+            'audit_data_access': True,
+            'gdpr_compliance_mode': True
+        }
+        
+        # Communication policies storage (in-memory, can be persisted to file/DB later) - FR-39
+        self._communication_policies = {
+            'ai_result_ready': {
+                'enabled': True,
+                'channels': ['in_app'],  # in_app, email, sms
+                'recipients': ['patient'],  # patient, doctor, clinic_manager
+                'frequency_limit': None,  # None = no limit, or number per day
+                'priority': 'normal'  # low, normal, high, urgent
+            },
+            'clinic_approved': {
+                'enabled': True,
+                'channels': ['in_app', 'email'],
+                'recipients': ['clinic_manager'],
+                'frequency_limit': None,
+                'priority': 'high'
+            },
+            'payment_success': {
+                'enabled': True,
+                'channels': ['in_app', 'email'],
+                'recipients': ['patient', 'clinic_manager'],
+                'frequency_limit': None,
+                'priority': 'normal'
+            },
+            'high_risk_alert': {
+                'enabled': True,
+                'channels': ['in_app', 'email', 'sms'],
+                'recipients': ['doctor', 'clinic_manager'],
+                'frequency_limit': 10,  # Max 10 per day
+                'priority': 'urgent'
+            }
+        }
+
     # ========== FR-35: Global Dashboard ==========
     
     def get_dashboard_summary(self) -> Dict[str, Any]:
@@ -471,3 +515,119 @@ class AdminService:
         ]
         
         return trend
+ 
+    # ========== FR-37: Privacy Settings Management ==========
+    
+    def get_privacy_settings(self) -> Dict[str, Any]:
+        """
+        Get privacy settings (FR-37)
+        Returns: Current privacy settings configuration
+        """
+        return self._privacy_settings.copy()
+    
+    def update_privacy_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Update privacy settings (FR-37)
+        Args:
+            settings: Dictionary with privacy settings to update
+        Returns: Updated privacy settings
+        """
+        # Validate settings
+        valid_keys = set(self._privacy_settings.keys())
+        provided_keys = set(settings.keys())
+        
+        invalid_keys = provided_keys - valid_keys
+        if invalid_keys:
+            raise ValueError(f"Invalid privacy settings keys: {invalid_keys}")
+        
+        # Update settings
+        self._privacy_settings.update(settings)
+        
+        return self._privacy_settings.copy()
+    
+    # ========== FR-39: Communication Policies Management ==========
+    
+    def get_communication_policies(self) -> Dict[str, Any]:
+        """
+        Get communication policies (FR-39)
+        Returns: Current communication policies configuration
+        """
+        return self._communication_policies.copy()
+    
+    def get_communication_policy_by_type(self, notification_type: str) -> Optional[Dict[str, Any]]:
+        """
+        Get communication policy for a specific notification type (FR-39)
+        Args:
+            notification_type: Type of notification (ai_result_ready, clinic_approved, etc.)
+        Returns: Policy for the notification type, or None if not found
+        """
+        return self._communication_policies.get(notification_type)
+    
+    def update_communication_policy(self, notification_type: str, policy: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Update communication policy for a notification type (FR-39)
+        Args:
+            notification_type: Type of notification
+            policy: Policy settings (enabled, channels, recipients, frequency_limit, priority)
+        Returns: Updated policy
+        """
+        if notification_type not in self._communication_policies:
+            raise ValueError(f"Unknown notification type: {notification_type}")
+        
+        # Validate policy structure
+        valid_keys = {'enabled', 'channels', 'recipients', 'frequency_limit', 'priority'}
+        provided_keys = set(policy.keys())
+        
+        invalid_keys = provided_keys - valid_keys
+        if invalid_keys:
+            raise ValueError(f"Invalid policy keys: {invalid_keys}")
+        
+        # Validate values
+        if 'enabled' in policy and not isinstance(policy['enabled'], bool):
+            raise ValueError("'enabled' must be a boolean")
+        
+        if 'channels' in policy:
+            valid_channels = {'in_app', 'email', 'sms'}
+            if not all(ch in valid_channels for ch in policy['channels']):
+                raise ValueError(f"Invalid channels. Must be one of: {valid_channels}")
+        
+        if 'recipients' in policy:
+            valid_recipients = {'patient', 'doctor', 'clinic_manager', 'admin'}
+            if not all(r in valid_recipients for r in policy['recipients']):
+                raise ValueError(f"Invalid recipients. Must be one of: {valid_recipients}")
+        
+        if 'priority' in policy:
+            valid_priorities = {'low', 'normal', 'high', 'urgent'}
+            if policy['priority'] not in valid_priorities:
+                raise ValueError(f"Invalid priority. Must be one of: {valid_priorities}")
+        
+        # Update policy
+        self._communication_policies[notification_type].update(policy)
+        
+        return self._communication_policies[notification_type].copy()
+    
+    def create_communication_policy(self, notification_type: str, policy: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Create new communication policy for a notification type (FR-39)
+        Args:
+            notification_type: Type of notification
+            policy: Policy settings
+        Returns: Created policy
+        """
+        if notification_type in self._communication_policies:
+            raise ValueError(f"Policy for {notification_type} already exists. Use update instead.")
+        
+        # Validate and create
+        required_keys = {'enabled', 'channels', 'recipients', 'priority'}
+        if not all(key in policy for key in required_keys):
+            raise ValueError(f"Missing required keys: {required_keys - set(policy.keys())}")
+        
+        self._communication_policies[notification_type] = {
+            'enabled': policy['enabled'],
+            'channels': policy['channels'],
+            'recipients': policy['recipients'],
+            'frequency_limit': policy.get('frequency_limit'),
+            'priority': policy['priority']
+        }
+        
+        return self._communication_policies[notification_type].copy()
