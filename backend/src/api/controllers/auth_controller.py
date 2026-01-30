@@ -266,6 +266,29 @@ def login():
     except Exception as e:
         return error_response(f'Internal server error: {str(e)}', 500)
 
+@auth_bp.route('/forgot-password', methods=['POST'])
+def forgot_password():
+    """
+    Forgot password - stub (chức năng đang phát triển).
+    Trả về 501 để frontend hiển thị thông báo thân thiện, tránh 404.
+    """
+    return error_response(
+        'Chức năng quên mật khẩu đang được cập nhật. Vui lòng liên hệ quản trị viên.',
+        501
+    )
+
+
+@auth_bp.route('/reset-password', methods=['POST'])
+def reset_password():
+    """
+    Reset password - stub (chức năng đang phát triển).
+    """
+    return error_response(
+        'Chức năng đặt lại mật khẩu đang được cập nhật. Vui lòng liên hệ quản trị viên.',
+        501
+    )
+
+
 @auth_bp.route('/me', methods=['GET'])
 def get_current_user_info():
     """

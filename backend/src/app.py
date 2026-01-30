@@ -4,11 +4,17 @@ from flask_jwt_extended import JWTManager
 from infrastructure.databases import init_db
 from api.routes import register_routes
 from config import Config, SwaggerConfig
+from cors import init_cors
 
 def create_app():
     """Create and configure Flask application"""
     app = Flask(__name__)
     app.config.from_object(Config)
+
+    # 0. CORS - cho phép frontend (cổng khác hoặc file) gọi API
+    init_cors(app)
+    print("✅ CORS enabled for frontend")
+    
     
     # 1. Initialize JWT
     jwt = JWTManager(app)
