@@ -18,6 +18,7 @@ from api.controllers.service_package_controller import service_package_bp
 from api.controllers.subscription_controller import subscription_bp
 from api.controllers.payment_controller import payment_bp
 from api.controllers.admin_controller import admin_bp
+from api.controllers.audit_log_controller import audit_log_bp
 
 def register_routes(app):
     """Register all API blueprints"""
@@ -51,3 +52,4 @@ def register_routes(app):
     
     # AURA System routes - Admin
     app.register_blueprint(admin_bp)
+    app.register_blueprint(audit_log_bp)

@@ -129,6 +129,13 @@ from .admin_schema import (
     AdminAnalyticsResponseSchema
 )
 
+# Audit Log Schemas
+from .audit_log_schema import (
+    AuditLogCreateRequestSchema,
+    AuditLogResponseSchema,
+    AuditLogSearchRequestSchema
+)
+
 __all__ = [
     # Authentication
     'LoginRequestSchema',
@@ -200,5 +207,10 @@ __all__ = [
     'RetrainingPolicySchema',
     'AdminDashboardResponseSchema',
     'AdminAnalyticsResponseSchema',
+     
+    # Audit Log
+    'AuditLogCreateRequestSchema',
+    'AuditLogResponseSchema',
+    'AuditLogSearchRequestSchema',
 ]
 
