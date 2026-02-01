@@ -173,6 +173,7 @@ def get_package_by_name(name):
 
 
 @service_package_bp.route('', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin', 'ClinicManager'])
 def get_all_packages():
     """
     Get all service packages

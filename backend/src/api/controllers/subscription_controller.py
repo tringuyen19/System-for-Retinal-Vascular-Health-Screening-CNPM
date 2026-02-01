@@ -186,7 +186,7 @@ def get_subscription(subscription_id):
 
 
 @subscription_bp.route('/account/<int:account_id>', methods=['GET'])
-@require_roles(['Patient', 'Doctor', 'Admin'])
+@require_roles(['Patient', 'Doctor', 'Admin', 'ClinicManager'])
 def get_subscriptions_by_account(account_id):
     """
     Get all subscriptions for an account
@@ -219,7 +219,7 @@ def get_subscriptions_by_account(account_id):
 
 
 @subscription_bp.route('/account/<int:account_id>/active', methods=['GET'])
-@require_roles(['Patient', 'Doctor', 'Admin'])
+@require_roles(['Patient', 'Doctor', 'Admin', 'ClinicManager'])
 def get_active_subscription(account_id):
     """
     Get active subscription for an account
@@ -357,6 +357,7 @@ def get_subscriptions_by_status(status):
 
 
 @subscription_bp.route('/expiring-soon', methods=['GET'])
+@require_roles(['Admin', 'ClinicManager'])
 def get_expiring_soon():
     """
     Get subscriptions expiring soon
@@ -530,6 +531,7 @@ def add_credit(subscription_id):
 
 
 @subscription_bp.route('/<int:subscription_id>/cancel', methods=['PUT'])
+@require_roles(['Patient', 'Admin', 'ClinicManager'])
 def cancel_subscription(subscription_id):
     """
     Cancel subscription
@@ -664,6 +666,7 @@ def renew_subscription(subscription_id):
 
 
 @subscription_bp.route('/<int:subscription_id>', methods=['DELETE'])
+@require_roles(['Admin'])
 def delete_subscription(subscription_id):
     """
     Delete subscription
