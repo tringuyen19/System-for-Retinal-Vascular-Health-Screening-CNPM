@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cài đặt hệ thống | AURA Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="../css/style.css" rel="stylesheet">
+</head>
+<body class="d-flex flex-column min-vh-100 aura-fixed-header">
+  <header class="aura-header navbar navbar-expand-lg navbar-dark fixed-top" style="background-color: #212121;">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="../index.html">AURA</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain"><span class="navbar-toggler-icon"></span></button>
+      <div class="collapse navbar-collapse" id="navbarMain">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item"><a class="nav-link" href="../index.html">Trang chủ</a></li>
+          <li class="nav-item"><a class="nav-link" href="../login.html">Đăng nhập</a></li>
+        </ul>
+        <ul class="navbar-nav ms-auto align-items-center">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown"><i class="bi bi-person-circle me-1"></i><span id="headerUserName">Admin</span></a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="dashboard.html">Dashboard</a></li>
+              <li><a class="dropdown-item" href="settings.html">Cài đặt hệ thống</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item text-danger" href="#" id="headerLogout">Đăng xuất</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </header>
+
+  <div class="d-flex flex-grow-1" style="padding-top: 56px;">
+    <aside class="aura-sidebar d-none d-md-flex flex-shrink-0 border-end bg-light" style="width: 250px; background-color: #f5f5f5 !important;">
+      <nav class="nav flex-column p-3 w-100">
+        <span class="text-muted small text-uppercase px-3 mb-2">Quản trị</span>
+        <a class="nav-link rounded mb-1" href="dashboard.html"><i class="bi bi-house-door me-2"></i>Dashboard</a>
+        <a class="nav-link rounded mb-1" href="accounts.html"><i class="bi bi-people me-2"></i>Tài khoản</a>
+        <a class="nav-link rounded mb-1" href="clinics.html"><i class="bi bi-building me-2"></i>Phòng khám</a>
+        <a class="nav-link rounded mb-1" href="ai-models.html"><i class="bi bi-cpu me-2"></i>AI Models</a>
+        <a class="nav-link rounded mb-1" href="statistics.html"><i class="bi bi-graph-up me-2"></i>Thống kê</a>
+        <hr class="my-2">
+        <a class="nav-link rounded mb-1 active" href="settings.html"><i class="bi bi-gear me-2"></i>Cài đặt hệ thống</a>
+      </nav>
+    </aside>
+
+    <main class="flex-grow-1 p-4" style="background-color: #f5f5f5;">
+      <div class="container-fluid">
+        <h1 class="h3 mb-4">Cài đặt hệ thống</h1>
+        <div id="pageError" class="alert alert-danger d-none"></div>
+
+        <ul class="nav nav-tabs mb-3" id="settingsTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-privacy" data-bs-toggle="tab" data-bs-target="#panel-privacy" type="button">Bảo mật &amp; Quyền riêng tư</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-ai" data-bs-toggle="tab" data-bs-target="#panel-ai" type="button">Cấu hình AI</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-policies" data-bs-toggle="tab" data-bs-target="#panel-policies" type="button">Chính sách thông báo</button>
+          </li>
+        </ul>
+
+        <div class="tab-content" id="settingsPanels">
+          <div class="tab-pane fade show active" id="panel-privacy" role="tabpanel">
+            <div class="card border-0 shadow-sm">
+              <div class="card-header bg-white"><h5 class="mb-0">Cài đặt bảo mật</h5></div>
+              <div class="card-body">
+                <div class="row g-2 mb-2">
+                  <div class="col-md-6">
+                    <label class="form-label">Số ngày lưu trữ dữ liệu</label>
+                    <input type="number" class="form-control" id="privacyDataRetentionDays" placeholder="365">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Tự động ẩn danh sau (ngày)</label>
+                    <input type="number" class="form-control" id="privacyAutoAnonymizeDays" placeholder="730">
+                  </div>
+                </div>
+                <div class="mb-2">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="privacyRequireConsentAi">
+                    <label class="form-check-label" for="privacyRequireConsentAi">Yêu cầu đồng ý cho huấn luyện AI</label>
+                  </div>
+                </div>
+                <div class="mb-2">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="privacyAllowDataSharing">
+                    <label class="form-check-label" for="privacyAllowDataSharing">Cho phép chia sẻ dữ liệu</label>
+                  </div>
+                </div>
+                <div class="mb-2">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="privacyAnonymizePatient">
+                    <label class="form-check-label" for="privacyAnonymizePatient">Ẩn danh dữ liệu bệnh nhân</label>
+                  </div>
+                </div>
+                <div class="mb-2">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="privacyEncryptSensitive">
+                    <label class="form-check-label" for="privacyEncryptSensitive">Mã hóa dữ liệu nhạy cảm</label>
+                  </div>
+                </div>
+                <div class="mb-2">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="privacyAuditAccess">
+                    <label class="form-check-label" for="privacyAuditAccess">Ghi nhật ký truy cập</label>
+                  </div>
+                </div>
+                <div class="mb-2">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="privacyGdprMode">
+                    <label class="form-check-label" for="privacyGdprMode">Chế độ tuân thủ GDPR</label>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" id="btnSavePrivacy">Lưu cài đặt bảo mật</button>
+              </div>
+            </div>
+          </div>
+          <div class="tab-pane fade" id="panel-ai" role="tabpanel">
+            <div class="card border-0 shadow-sm">
+              <div class="card-header bg-white"><h5 class="mb-0">Cấu hình AI</h5></div>
+              <div class="card-body">
+                <div class="mb-2">
+                  <label class="form-label">Threshold (JSON)</label>
+                  <textarea class="form-control font-monospace small" id="aiThresholdConfig" rows="4" placeholder='{"confidence": 0.8}'></textarea>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label">Chính sách huấn luyện lại (JSON, tùy chọn)</label>
+                  <textarea class="form-control font-monospace small" id="aiRetrainingPolicy" rows="3" placeholder="{}"></textarea>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" id="btnSaveAiConfig">Lưu cấu hình AI</button>
+              </div>
+            </div>
+          </div>
+          <div class="tab-pane fade" id="panel-policies" role="tabpanel">
+            <div class="card border-0 shadow-sm">
+              <div class="card-header bg-white"><h5 class="mb-0">Chính sách thông báo</h5></div>
+              <div class="card-body">
+                <p class="text-muted small">Danh sách chính sách thông báo (xem / sửa từ API). Hiển thị dữ liệu đọc được.</p>
+                <pre id="policiesJson" class="bg-light p-3 rounded small" style="max-height: 300px; overflow: auto;">Đang tải...</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <footer class="aura-footer py-3 border-top" style="background-color: #f5f5f5;">
+    <div class="container-fluid"><span class="text-muted small">&copy; 2025 AURA</span></div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/components/header.js"></script>
+  <script src="../js/components/sidebar.js"></script>
+  <script src="../js/components/alert.js"></script>
+  <script src="../js/pages/admin-settings.js"></script>
+</body>
+</html>
