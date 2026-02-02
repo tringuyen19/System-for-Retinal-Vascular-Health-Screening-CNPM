@@ -125,3 +125,68 @@ main.aura-main { min-height: calc(100vh - 56px); }
 
 /* Footer */
 .aura-footer { flex-shrink: 0; }
+
+/* ========== Kết quả phân tích AI (Patient) ========== */
+.aura-analysis-card {
+  border-radius: var(--aura-radius-lg);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.aura-analysis-card:hover {
+  box-shadow: var(--aura-shadow-hover);
+}
+
+.aura-analysis-metrics {
+  background: linear-gradient(135deg, #f8f9fa 0%, #f1f3f5 100%);
+  border-radius: var(--aura-radius-lg);
+  padding: var(--aura-space-m);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.aura-metrics-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--aura-text-primary);
+  margin-bottom: var(--aura-space-s);
+  letter-spacing: 0.02em;
+}
+
+.aura-metrics-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--aura-space-m);
+}
+
+.aura-metric-item {
+  padding: var(--aura-space-s) 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+.aura-metric-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.aura-metric-line {
+  font-size: 0.875rem;
+  margin-bottom: 0.4rem;
+}
+.aura-metric-line:last-child {
+  margin-bottom: 0;
+}
+
+.aura-metric-label {
+  color: var(--aura-text-secondary);
+  font-weight: 500;
+}
+.aura-metric-value {
+  color: var(--aura-text-primary);
+}
+
+.aura-risk-badge {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.35rem 0.75rem;
+  letter-spacing: 0.02em;
+}
+.aura-risk-badge.bg-warning {
+  color: #212529;
+}

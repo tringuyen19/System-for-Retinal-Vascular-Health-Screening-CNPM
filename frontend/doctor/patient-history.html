@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hồ sơ bác sĩ | AURA</title>
+  <title>Lịch sử & xu hướng | Bác sĩ | AURA</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
   <link href="../css/style.css" rel="stylesheet">
@@ -15,14 +15,14 @@
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain"><span class="navbar-toggler-icon"></span></button>
       <div class="collapse navbar-collapse" id="navbarMain">
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-          <li class="nav-item"><a class="nav-link" href="../index.html">Trang chủ</a></li>
           <li class="nav-item"><a class="nav-link" href="dashboard.html">Dashboard</a></li>
+          <li class="nav-item"><a class="nav-link" href="patients.html">Bệnh nhân</a></li>
         </ul>
         <ul class="navbar-nav ms-auto align-items-center">
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown"><i class="bi bi-person-circle me-1"></i><span id="headerUserName">Tài khoản</span></a>
             <ul class="dropdown-menu dropdown-menu-end">
-              <li><a class="dropdown-item active" href="profile.html">Hồ sơ</a></li>
+              <li><a class="dropdown-item" href="profile.html">Hồ sơ</a></li>
               <li><a class="dropdown-item" href="settings.html">Cài đặt</a></li>
               <li><hr class="dropdown-divider"></li>
               <li><a class="dropdown-item text-danger" href="#" id="headerLogout">Đăng xuất</a></li>
@@ -39,40 +39,76 @@
         <span class="text-muted small text-uppercase px-3 mb-2">Bác sĩ</span>
         <a class="nav-link rounded mb-1" href="dashboard.html"><i class="bi bi-house-door me-2"></i>Dashboard</a>
         <a class="nav-link rounded mb-1" href="performance.html"><i class="bi bi-speedometer2 me-2"></i>Hiệu suất &amp; báo cáo</a>
-        <a class="nav-link rounded mb-1" href="patients.html"><i class="bi bi-people me-2"></i>Bệnh nhân</a>
+        <a class="nav-link rounded mb-1 active" href="patients.html"><i class="bi bi-people me-2"></i>Bệnh nhân</a>
         <a class="nav-link rounded mb-1" href="reviews.html"><i class="bi bi-clipboard-check me-2"></i>Duyệt kết quả AI</a>
         <a class="nav-link rounded mb-1" href="analysis-results.html"><i class="bi bi-graph-up-arrow me-2"></i>Kết quả & chú thích AI</a>
         <a class="nav-link rounded mb-1" href="create-report.html"><i class="bi bi-file-earmark-plus me-2"></i>Tạo báo cáo</a>
         <a class="nav-link rounded mb-1" href="messages.html"><i class="bi bi-chat-dots me-2"></i>Tin nhắn</a>
         <hr class="my-2">
-        <a class="nav-link rounded mb-1 active" href="profile.html"><i class="bi bi-person me-2"></i>Hồ sơ</a>
+        <a class="nav-link rounded mb-1" href="profile.html"><i class="bi bi-person me-2"></i>Hồ sơ</a>
         <a class="nav-link rounded mb-1" href="settings.html"><i class="bi bi-gear me-2"></i>Cài đặt</a>
       </nav>
     </aside>
 
     <main class="flex-grow-1 p-4" style="background-color: #f5f5f5;">
       <div class="container-fluid">
-        <h1 class="h3 mb-4">Hồ sơ bác sĩ</h1>
-        <div id="profileError" class="alert alert-danger d-none"></div>
-        <div class="card border-0 shadow-sm">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+          <div>
+            <h1 class="h3 mb-1"><i class="bi bi-activity me-2"></i>Lịch sử phân tích & xu hướng</h1>
+          </div>
+          <div class="d-flex gap-2">
+            <select class="form-select form-select-sm" id="trendDays" style="min-width: 140px;">
+              <option value="30">30 ngày</option>
+              <option value="90" selected>90 ngày</option>
+              <option value="180">180 ngày</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="pageError" class="alert alert-danger d-none"></div>
+
+        <div class="card border-0 shadow-sm mb-3">
           <div class="card-body">
-            <form id="profileForm">
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Họ tên bác sĩ <span class="text-danger">*</span></label>
-                  <input type="text" class="form-control" id="doctorName" name="doctor_name" required placeholder="VD: BS. Nguyễn Văn A">
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Chuyên khoa <span class="text-danger">*</span></label>
-                  <input type="text" class="form-control" id="specialization" name="specialization" required placeholder="VD: Nhãn khoa">
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Số chứng chỉ hành nghề <span class="text-danger">*</span></label>
-                  <input type="text" class="form-control" id="licenseNumber" name="license_number" required placeholder="VD: DR12345">
-                </div>
+            <div class="d-flex flex-wrap justify-content-between gap-2 align-items-start">
+              <div>
+                <div class="text-muted small">Bệnh nhân</div>
+                <div class="h5 mb-0" id="patientName">-</div>
+                <div class="text-muted small" id="patientMeta">-</div>
               </div>
-              <button type="submit" class="btn btn-primary" id="btnSave">Lưu thay đổi</button>
-            </form>
+              <div class="text-end">
+                <div class="text-muted small">Xu hướng</div>
+                <div class="h5 mb-0" id="trendLabel">-</div>
+                <div class="text-muted small" id="trendHint">-</div>
+              </div>
+            </div>
+            <div class="mt-3" id="trendChartWrap"></div>
+            <div class="mt-3" id="riskDistribution"></div>
+          </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Lịch sử phân tích</h5>
+          </div>
+          <div class="card-body">
+            <div id="historyLoading" class="text-center py-4">Đang tải...</div>
+            <div id="historyEmpty" class="text-center text-muted py-4 d-none">Chưa có lịch sử phân tích.</div>
+            <div class="table-responsive d-none" id="historyTableWrap">
+              <table class="table table-hover align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th>Thời gian</th>
+                    <th>Trạng thái</th>
+                    <th>Kết quả</th>
+                    <th>Mức rủi ro</th>
+                    <th>Độ tin cậy</th>
+                    <th>Ảnh</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="historyBody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -91,6 +127,7 @@
   <script src="../js/components/header.js"></script>
   <script src="../js/components/sidebar.js"></script>
   <script src="../js/components/alert.js"></script>
-  <script src="../js/pages/doctor-profile.js"></script>
+  <script src="../js/pages/doctor-patient-history.js"></script>
 </body>
 </html>
+

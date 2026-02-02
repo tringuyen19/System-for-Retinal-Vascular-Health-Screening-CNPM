@@ -168,19 +168,20 @@ class PatientProfileRepository(IPatientProfileRepository):
         finally:
             self.session.close()
     
-    def search_by_name_and_clinic(self, patient_name: str, clinic_id: Optional[int] = None) -> List[PatientProfile]:
+    def search_by_name_and_clinic(self, patient_name: str, clinic_id: Optional[int] = None,
+                                   patient_id: Optional[int] = None) -> List[PatientProfile]:
         """
-        Search patients by name, optionally filtered by clinic (FR-18)
+        Search patients by name, optionally filtered by clinic and/or patient_id (FR-18)
         """
         try:
             from infrastructure.models.account_model import AccountModel
             query = self.session.query(PatientProfileModel).join(
                 AccountModel, PatientProfileModel.account_id == AccountModel.account_id
             ).filter(PatientProfileModel.patient_name.like(f'%{patient_name}%'))
-            
             if clinic_id:
                 query = query.filter(AccountModel.clinic_id == clinic_id)
-            
+            if patient_id is not None:
+                query = query.filter(PatientProfileModel.patient_id == patient_id)
             patient_models = query.all()
             return [self._to_domain(model) for model in patient_models]
         except Exception as e:
@@ -188,8 +189,9 @@ class PatientProfileRepository(IPatientProfileRepository):
         finally:
             self.session.close()
     
-    def get_by_risk_level(self, risk_level: str, clinic_id: Optional[int] = None, 
-                          patient_name: Optional[str] = None) -> List[PatientProfile]:
+    def get_by_risk_level(self, risk_level: str, clinic_id: Optional[int] = None,
+                          patient_name: Optional[str] = None,
+                          patient_id: Optional[int] = None) -> List[PatientProfile]:
         """
         Get patients by risk level with optional filters (FR-18)
         Uses JOIN: patient_profiles -> retinal_images -> ai_analysis -> ai_results
@@ -199,24 +201,22 @@ class PatientProfileRepository(IPatientProfileRepository):
             from infrastructure.models.imaging.retinal_image_model import RetinalImageModel
             from infrastructure.models.ai.ai_analysis_model import AiAnalysisModel
             from infrastructure.models.ai.ai_result_model import AiResultModel
-            
-            # Complex JOIN query to filter by risk_level
+
             query = self.session.query(PatientProfileModel).distinct().join(
                 AccountModel, PatientProfileModel.account_id == AccountModel.account_id
             ).join(
-                RetinalImageModel, PatientProfileModel.account_id == RetinalImageModel.patient_id
+                RetinalImageModel, PatientProfileModel.patient_id == RetinalImageModel.patient_id
             ).join(
                 AiAnalysisModel, RetinalImageModel.image_id == AiAnalysisModel.image_id
             ).join(
                 AiResultModel, AiAnalysisModel.analysis_id == AiResultModel.analysis_id
             ).filter(AiResultModel.risk_level == risk_level)
-            
-            # Apply optional filters
             if clinic_id:
                 query = query.filter(AccountModel.clinic_id == clinic_id)
             if patient_name:
                 query = query.filter(PatientProfileModel.patient_name.like(f'%{patient_name}%'))
-            
+            if patient_id is not None:
+                query = query.filter(PatientProfileModel.patient_id == patient_id)
             patient_models = query.all()
             return [self._to_domain(model) for model in patient_models]
         except Exception as e:

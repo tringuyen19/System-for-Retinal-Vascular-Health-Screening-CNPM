@@ -58,13 +58,52 @@ class AiResultService:
         
         if not result:
             raise ValueError("Failed to create AI result")
-
-        # Auto-alert for high-risk results (FR-29)
+        
+        # FR-5: Gửi khuyến nghị/cảnh báo sức khỏe tự động cho patient
+        if self.notification_repository:
+            self._send_patient_recommendation(result)
+        # Auto-alert for high-risk results (FR-29) – gửi cho Doctor/Clinic Manager
         if risk_level.lower() in ['high', 'critical'] and self.notification_repository:
             self._send_high_risk_alert(result)
         
         return result
-
+    
+    def _send_patient_recommendation(self, result: AiResult):
+        """
+        FR-5: Gửi khuyến nghị hoặc cảnh báo sức khỏe tự động cho patient khi có kết quả AI.
+        Điều kiện: có AI result, có image -> patient_id -> account_id của patient.
+        """
+        try:
+            from services.notification_service import NotificationService
+            from services.recommendation_service import RecommendationService
+            from infrastructure.repositories.patient_profile_repository import PatientProfileRepository
+            from infrastructure.databases.mssql import session
+            
+            if not self.analysis_repository or not self.image_repository:
+                return
+            analysis = self.analysis_repository.get_by_id(result.analysis_id)
+            if not analysis:
+                return
+            image = self.image_repository.get_by_id(analysis.image_id)
+            if not image:
+                return
+            patient = PatientProfileRepository(session).get_by_id(image.patient_id)
+            if not patient or not patient.account_id:
+                return
+            # Map 'critical' -> 'high' cho RecommendationService (chỉ nhận high/medium/low)
+            risk_for_rec = result.risk_level if result.risk_level != 'critical' else 'high'
+            recommendation = RecommendationService.generate_recommendations(
+                risk_for_rec, result.disease_type
+            )
+            notification_service = NotificationService(self.notification_repository)
+            notification_service.send_notification(
+                account_id=patient.account_id,
+                notification_type='health_recommendation',
+                content=recommendation
+            )
+        except Exception as e:
+            print(f"Warning: Failed to send patient health recommendation: {str(e)}")
+    
     def _send_high_risk_alert(self, result: AiResult):
         """
         Send high-risk alert notification automatically (FR-29)
@@ -152,6 +191,18 @@ class AiResultService:
     def list_all_results(self) -> List[AiResult]:
         """Get all results"""
         return self.repository.get_all()
+
+    def get_results_by_doctor(self, doctor_id: int) -> List[AiResult]:
+        """Get results for analyses that this doctor has reviewed (patient belongs to doctor)."""
+        return self.repository.get_all_by_doctor(doctor_id)
+
+    def get_results_by_doctor_with_patient(self, doctor_id: int) -> List[dict]:
+        """Get results with patient_name for doctor (for API display)."""
+        return self.repository.get_all_by_doctor_with_patient(doctor_id)
+
+    def list_all_results_with_patient(self) -> List[dict]:
+        """Get all results with patient_name (for Admin API display)."""
+        return self.repository.get_all_with_patient()
     
     def update_result(self, result_id: int, **kwargs) -> Optional[AiResult]:
         """Update result"""

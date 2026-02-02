@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  if (!window.AuraAuth || !window.AuraAuth.requireLogin || !window.AuraAuth.requireLogin()) return;
+  if (!window.AuraAuth || !window.AuraAuth.requireRole || !window.AuraAuth.requireRole('Patient')) return;
 
   var user = window.AuraAuth.getUser();
   var accountId = user && user.account_id;
@@ -42,8 +42,8 @@
         var date = r.created_at ? r.created_at.slice(0, 10) : '-';
         var url = r.report_url ? '<a href="' + r.report_url + '" target="_blank" class="btn btn-sm btn-outline-primary">Xem / Tải PDF</a>' : '<span class="text-muted small">Chưa có file</span>';
         return '<div class="list-group-item d-flex justify-content-between align-items-center">' +
-          '<div><strong>Báo cáo #' + (r.report_id || r.id) + '</strong> – Phân tích #' + (r.analysis_id || '-') + ' – ' + date + '</div>' +
-          '<div>' + url + '</div></div>';
+          '<div><strong>Báo cáo' + (r.report_id || r.id) + '</strong> – Phân tích' + (r.analysis_id || '-') + ' – ' + date + '</div>' +
+          '<div>' + url + '</div></div>'; 
       }).join('') + '</div>';
     })
     .catch(function (err) {

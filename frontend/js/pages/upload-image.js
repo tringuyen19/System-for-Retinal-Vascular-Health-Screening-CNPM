@@ -1,15 +1,17 @@
 /**
  * AURA - Patient Upload Image
- * Drag & drop, file input, preview, upload (image_url: data URL hoặc URL từ server)
+ * Drag & drop, file input, preview, upload
+ * Luồng chuẩn: upload file -> nhận URL -> lưu record retinal_images.image_url
  */
 (function () {
   'use strict';
 
-  if (!window.AuraAuth || !window.AuraAuth.requireLogin || !window.AuraAuth.requireLogin()) return;
+  if (!window.AuraAuth || !window.AuraAuth.requireRole || !window.AuraAuth.requireRole('Patient')) return;
 
   var user = window.AuraAuth.getUser();
   var accountId = user && user.account_id;
   var patientId = null;
+  var selectedFile = null;
   var selectedFileDataUrl = null;
 
   var dropZone = document.getElementById('dropZone');
@@ -59,6 +61,7 @@
       return;
     }
     showError('');
+    selectedFile = file;
     selectedFileDataUrl = null;
     readFileAsDataUrl(file).then(function (dataUrl) {
       selectedFileDataUrl = dataUrl;
@@ -90,25 +93,37 @@
 
   if (btnUpload) {
     btnUpload.addEventListener('click', function () {
-      if (!selectedFileDataUrl || !patientId) {
+      if (!selectedFile || !patientId) {
         showError('Vui lòng chọn ảnh và đảm bảo đã có hồ sơ bệnh nhân.');
         return;
       }
       showError('');
       btnUpload.disabled = true;
-      setProgress(30);
-      var payload = {
-        patient_id: patientId,
-        clinic_id: user.clinic_id || 1,
-        uploaded_by: accountId,
-        image_type: imageType ? imageType.value : 'fundus',
-        eye_side: eyeSide ? eyeSide.value : 'left',
-        image_url: selectedFileDataUrl
-      };
-      window.AuraAPI.uploadImage(payload)
+      setProgress(20);
+
+      // 1) Upload file to backend static/uploads/retinal
+      window.AuraAPI.uploadFile(selectedFile, 'retinal')
+        .then(function (uploaded) {
+          // uploaded: { url, full_url, ... }
+          var imageUrl = (uploaded && (uploaded.full_url || uploaded.url)) || null;
+          if (!imageUrl) throw new Error('Upload file thành công nhưng không nhận được URL.');
+          setProgress(60);
+
+          // 2) Save DB record (retinal_images) with image_url = URL
+          var payload = {
+            patient_id: patientId,
+            clinic_id: user.clinic_id || 1,
+            uploaded_by: accountId,
+            image_type: imageType ? imageType.value : 'fundus',
+            eye_side: eyeSide ? eyeSide.value : 'left',
+            image_url: imageUrl
+          };
+          return window.AuraAPI.uploadImage(payload);
+        })
         .then(function () {
           setProgress(100);
           if (window.AuraAlert && window.AuraAlert.toast) window.AuraAlert.toast('Upload ảnh thành công.', 'success');
+          selectedFile = null;
           selectedFileDataUrl = null;
           if (previewWrap) previewWrap.classList.add('d-none');
           if (fileInput) fileInput.value = '';

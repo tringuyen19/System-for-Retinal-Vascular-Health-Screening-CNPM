@@ -20,7 +20,9 @@ analysis_repo = AiAnalysisRepository(session)
 doctor_repo = DoctorProfileRepository(session)
 
 # Initialize SERVICES (Business Logic Layer) ✅
-review_service = DoctorReviewService(review_repo)
+# Inject AiAnalysisRepository into DoctorReviewService so it can compute
+# "pending analyses that need review" correctly for FR-15.
+review_service = DoctorReviewService(review_repo, analysis_repo)
 analysis_service = AiAnalysisService(analysis_repo)
 doctor_service = DoctorProfileService(doctor_repo)
 
@@ -231,6 +233,37 @@ def get_reviews_by_doctor(doctor_id):
         return error_response(f'Internal server error: {str(e)}', 500)
 
 
+@doctor_review_bp.route('/patient/<int:patient_id>/doctors', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
+def get_doctors_who_reviewed_patient(patient_id):
+    """
+    Get doctors who have reviewed this patient's analyses (FR-10: patient can chat with assigned doctor).
+    ---
+    tags:
+      - Doctor Review
+    security:
+      - Bearer: []
+    parameters:
+      - name: patient_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    responses:
+      200:
+        description: List of doctors (doctor_id, doctor_name)
+    """
+    try:
+        doctors = review_service.get_doctors_who_reviewed_patient(patient_id)
+        return success_response({
+            'patient_id': patient_id,
+            'count': len(doctors),
+            'doctors': doctors
+        })
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
 @doctor_review_bp.route('/status/<status>', methods=['GET'])
 @require_roles(['Doctor', 'Admin'])
 def get_reviews_by_status(status):
@@ -282,16 +315,18 @@ def get_pending_reviews():
         description: List of analyses pending review
     """
     try:
-        pending = review_service.get_pending_reviews()
+        # Returns analyses that are completed but have no doctor review yet
+        pending_analyses = review_service.get_pending_reviews()
         
         return success_response({
-            'count': len(pending),
+            'count': len(pending_analyses),
             'pending_analyses': [{
                 'analysis_id': a.analysis_id,
                 'image_id': a.image_id,
                 'status': a.status,
-                'completed_at': a.completed_at.isoformat() if a.completed_at else None
-            } for a in pending]
+                # Use analysis_time as completion time; ai_analysis table does not have a separate completed_at column
+                'completed_at': a.analysis_time.isoformat() if getattr(a, 'analysis_time', None) else None
+            } for a in pending_analyses]
         })
         
     except Exception as e:

@@ -38,6 +38,8 @@
         <a class="nav-link rounded mb-1" href="analysis-results.html"><i class="bi bi-graph-up me-2"></i>Kết quả phân tích</a>
         <a class="nav-link rounded mb-1" href="reports.html"><i class="bi bi-file-earmark-text me-2"></i>Báo cáo</a>
         <a class="nav-link rounded mb-1 active" href="messages.html"><i class="bi bi-chat-dots me-2"></i>Tin nhắn</a>
+        <a class="nav-link rounded mb-1" href="notifications.html"><i class="bi bi-bell me-2"></i>Thông báo</a>
+        <a class="nav-link rounded mb-1" href="subscriptions.html"><i class="bi bi-box-seam me-2"></i>Gói dịch vụ</a>
         <hr class="my-2">
         <a class="nav-link rounded mb-1" href="profile.html"><i class="bi bi-person me-2"></i>Hồ sơ</a>
         <a class="nav-link rounded mb-1" href="settings.html"><i class="bi bi-gear me-2"></i>Cài đặt</a>
@@ -45,11 +47,40 @@
     </aside>
     <main class="flex-grow-1 p-4" style="background-color: #f5f5f5;">
       <div class="container-fluid">
-        <h1 class="h3 mb-4">Tin nhắn</h1>
-        <div class="card border-0 shadow-sm">
-          <div class="card-body text-center py-5 text-muted">
-            <i class="bi bi-chat-dots display-4 mb-3"></i>
-            <p class="mb-0">Chức năng tin nhắn với bác sĩ đang được cập nhật.</p>
+        <h1 class="h3 mb-4">Tư vấn trực tuyến với bác sĩ</h1>
+        <p class="text-muted mb-4">Trao đổi với bác sĩ đã review kết quả phân tích của bạn (FR-10 / FR-20).</p>
+        <div id="pageError" class="alert alert-danger d-none"></div>
+        <div class="row">
+          <div class="col-md-4 mb-3">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-header bg-white"><h5 class="mb-0">Bác sĩ đã review kết quả của bạn</h5></div>
+              <div class="card-body p-0">
+                <div id="conversationsLoading" class="text-center py-4">Đang tải...</div>
+                <div id="conversationsList" class="list-group list-group-flush d-none">
+                  <div id="conversationsEmpty" class="text-muted text-center py-4 d-none">Chưa có bác sĩ nào review.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-8">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-header bg-white d-flex align-items-center" id="chatHeader">
+                <span class="text-muted" id="chatTitle">Chọn bác sĩ để nhắn tin</span>
+              </div>
+              <div class="card-body d-flex flex-column p-0" style="min-height: 320px;">
+                <div id="messagesArea" class="flex-grow-1 overflow-auto p-3" style="max-height: 360px;">
+                  <p class="text-muted text-center mb-0" id="messagesPlaceholder">Chọn một bác sĩ để xem và gửi tin nhắn.</p>
+                  <div id="messagesList" class="d-none"></div>
+                </div>
+                <div class="border-top p-3 d-none" id="messageFormWrap">
+                  <form id="messageForm" class="d-flex gap-2">
+                    <input type="hidden" id="currentConversationId" value="">
+                    <input type="text" class="form-control" id="messageContent" placeholder="Nhập tin nhắn..." required>
+                    <button type="submit" class="btn btn-primary" id="btnSend">Gửi</button>
+                  </form>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -63,5 +94,7 @@
   <script src="../js/utils.js"></script>
   <script src="../js/components/header.js"></script>
   <script src="../js/components/sidebar.js"></script>
+  <script src="../js/components/alert.js"></script>
+  <script src="../js/pages/patient-messages.js"></script>
 </body>
 </html>

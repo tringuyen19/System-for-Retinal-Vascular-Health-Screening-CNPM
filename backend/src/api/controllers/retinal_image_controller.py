@@ -4,12 +4,15 @@ from api.middleware.auth_middleware import require_roles, require_role
 from infrastructure.repositories.retinal_image_repository import RetinalImageRepository
 from infrastructure.repositories.patient_profile_repository import PatientProfileRepository
 from infrastructure.repositories.clinic_repository import ClinicRepository
+from infrastructure.repositories.subscription_repository import SubscriptionRepository
 from infrastructure.databases.mssql import session
 from services.retinal_image_service import RetinalImageService
 from services.patient_profile_service import PatientProfileService
 from services.clinic_service import ClinicService
+from services.subscription_service import SubscriptionService
 from api.responses import success_response, error_response, not_found_response, validation_error_response
 from api.schemas import RetinalImageCreateRequestSchema, RetinalImageUpdateRequestSchema, RetinalImageResponseSchema, RetinalImageBulkCreateRequestSchema
+from domain.exceptions import BusinessRuleException
 
 retinal_image_bp = Blueprint('retinal_image', __name__, url_prefix='/api/retinal-images')
 
@@ -17,11 +20,13 @@ retinal_image_bp = Blueprint('retinal_image', __name__, url_prefix='/api/retinal
 image_repo = RetinalImageRepository(session)
 patient_repo = PatientProfileRepository(session)
 clinic_repo = ClinicRepository(session)
+subscription_repo = SubscriptionRepository(session)
 
 # Initialize SERVICES (Business Logic Layer) ✅
 image_service = RetinalImageService(image_repo)
 patient_service = PatientProfileService(patient_repo)
 clinic_service = ClinicService(clinic_repo)
+subscription_service = SubscriptionService(subscription_repo)
 
 
 @retinal_image_bp.route('/health', methods=['GET'])
@@ -120,6 +125,17 @@ def upload_image():
         clinic = clinic_service.get_clinic_by_id(data['clinic_id'])
         if not clinic:
             return not_found_response('Clinic not found')
+        
+        # FR-11/12: Trừ 1 credit khi upload. remaining = tổng image_limit các gói đã mua - số lần đã up ảnh.
+        account_id = data['uploaded_by']
+        if subscription_service.get_remaining_credits(account_id) < 1:
+            return error_response('Hết lượt phân tích. Vui lòng mua thêm gói.', 402)
+        try:
+            updated = subscription_service.deduct_credit_for_account(account_id, 1)
+            if not updated:
+                return error_response('Hết lượt phân tích. Vui lòng mua thêm gói.', 402)
+        except BusinessRuleException as e:
+            return error_response(str(e) or 'Hết lượt phân tích. Vui lòng mua thêm gói.', 402)
         
         # Upload image
         image = image_service.upload_image(

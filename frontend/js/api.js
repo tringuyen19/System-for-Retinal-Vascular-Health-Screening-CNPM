@@ -54,6 +54,29 @@
     return data;
   }
 
+  /** Upload file (multipart/form-data) to /api/uploads */
+  async function uploadFile(file, category) {
+    if (!file) throw new Error('Thiếu file upload.');
+    const form = new FormData();
+    form.append('file', file);
+    if (category) form.append('category', category);
+
+    const headers = {};
+    const key = (window.AURA_CONFIG && window.AURA_CONFIG.STORAGE_KEYS && window.AURA_CONFIG.STORAGE_KEYS.TOKEN) || 'aura_access_token';
+    const token = localStorage.getItem(key);
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+
+    let res;
+    try {
+      res = await fetch(API_BASE + '/api/uploads', { method: 'POST', headers, body: form });
+    } catch (e) {
+      throw new Error('Không thể kết nối máy chủ. Kiểm tra backend đã chạy tại ' + API_BASE + ' chưa.');
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(parseErrorMessage(res, data));
+    return data.data; // { url, full_url, ... }
+  }
+
   /** Login - POST /api/auth/login (không gửi token) */
   async function login(credentials) {
     return request('POST', '/api/auth/login', credentials, false);
@@ -138,6 +161,12 @@
     return res.data;
   }
 
+  /** Doctor: danh sách bệnh nhân của bác sĩ - patient upload ảnh -> AI phân tích -> bác sĩ review (GET /api/doctors/:id/patients) */
+  async function getDoctorPatients(doctorId) {
+    const res = await request('GET', '/api/doctors/' + doctorId + '/patients');
+    return res.data;
+  }
+
   /** Doctor: tạo hồ sơ bác sĩ (POST /api/doctors) */
   async function createDoctor(payload) {
     const res = await request('POST', '/api/doctors', payload);
@@ -151,8 +180,10 @@
   }
 
   /** Doctor: tìm kiếm bệnh nhân (GET /api/patients/search?name=&clinic_id=&risk_level=) */
+  /** FR-18: Tìm kiếm/lọc bệnh nhân theo mã (patient_id), tên (name), mức rủi ro (risk_level) */
   async function searchPatients(params) {
     const q = new URLSearchParams();
+    if (params && params.patient_id != null && params.patient_id !== '') q.set('patient_id', params.patient_id);
     if (params && params.name) q.set('name', params.name);
     if (params && params.clinic_id != null) q.set('clinic_id', params.clinic_id);
     if (params && params.risk_level) q.set('risk_level', params.risk_level);
@@ -209,11 +240,31 @@
     return res.data;
   }
 
-  /** Doctor: danh sách hội thoại (GET /api/conversations/doctor/:id) */
+  /** Doctor: danh sách hội thoại (GET /api/conversations/doctor/:id). Trả full response { message, data: { doctor_id, count, conversations } } */
   async function getConversationsByDoctor(doctorId, activeOnly) {
     let path = '/api/conversations/doctor/' + doctorId;
     if (activeOnly) path += '?active_only=true';
     const res = await request('GET', path);
+    return res && res.data != null ? res : { data: res };
+  }
+
+  /** Patient: danh sách hội thoại (GET /api/conversations/patient/:id) - FR-10 */
+  async function getConversationsByPatient(patientId, activeOnly) {
+    let path = '/api/conversations/patient/' + patientId;
+    if (activeOnly) path += '?active_only=true';
+    const res = await request('GET', path);
+    return res.data;
+  }
+
+  /** Patient: bác sĩ đã review kết quả của patient (GET /api/doctor-reviews/patient/:id/doctors) - FR-10 */
+  async function getDoctorsWhoReviewedPatient(patientId) {
+    const res = await request('GET', '/api/doctor-reviews/patient/' + patientId + '/doctors');
+    return res.data;
+  }
+
+  /** Tạo hoặc lấy hội thoại patient-doctor (POST /api/conversations) - FR-10 */
+  async function createConversation(patientId, doctorId) {
+    const res = await request('POST', '/api/conversations', { patient_id: patientId, doctor_id: doctorId });
     return res.data;
   }
 
@@ -231,6 +282,50 @@
     if (offset != null) q.push('offset=' + offset);
     if (q.length) path += '?' + q.join('&');
     const res = await request('GET', path);
+    return res.data;
+  }
+
+  /** AI Analysis: trend theo bệnh nhân (GET /api/ai-analysis/patient/:id/trend?days=) - FR-17 */
+  async function getPatientTrend(patientId, days) {
+    let path = '/api/ai-analysis/patient/' + patientId + '/trend';
+    if (days != null) path += '?days=' + days;
+    const res = await request('GET', path);
+    return res.data;
+  }
+
+  /** AI Results: danh sách tất cả (GET /api/ai-results) - entity [dbo].[ai_results] - Doctor/Admin */
+  async function getAllResults() {
+    const res = await request('GET', '/api/ai-results');
+    return res.data;
+  }
+
+  /** AI Results: kết quả theo analysis (GET /api/ai-results/analysis/:id) - disease_type, risk_level, confidence_score */
+  async function getResultsByAnalysis(analysisId) {
+    const res = await request('GET', '/api/ai-results/analysis/' + analysisId);
+    return res.data;
+  }
+
+  /** AI Annotations: danh sách tất cả (GET /api/ai-annotations) - entity [dbo].[ai_annotations] - Doctor/Admin */
+  async function getAllAnnotations() {
+    const res = await request('GET', '/api/ai-annotations');
+    return res.data;
+  }
+
+  /** AI Annotations: chú thích theo analysis (GET /api/ai-annotations/analysis/:id) - FR-14 Doctor xem chú thích */
+  async function getAnnotationByAnalysis(analysisId) {
+    const res = await request('GET', '/api/ai-annotations/analysis/' + analysisId);
+    return res.data;
+  }
+
+  /** AI Analysis: danh sách phân tích đã hoàn thành (GET /api/ai-analysis/completed) - Doctor/Admin */
+  async function getCompletedAnalyses() {
+    const res = await request('GET', '/api/ai-analysis/completed');
+    return res.data;
+  }
+
+  /** Retinal image: chi tiết ảnh theo id (GET /api/retinal-images/:id) - patient_id, image_url */
+  async function getRetinalImage(imageId) {
+    const res = await request('GET', '/api/retinal-images/' + imageId);
     return res.data;
   }
 
@@ -350,6 +445,307 @@
     return res.data;
   }
 
+  /** Subscriptions: số lượt còn lại (GET /api/subscriptions/account/:id/credits) - FR-12 */
+  async function getAccountCredits(accountId) {
+    const res = await request('GET', '/api/subscriptions/account/' + accountId + '/credits');
+    return res.data;
+  }
+
+  /** Subscriptions: mua gói demo PTT chuyển khoản (POST /api/subscriptions/purchase-demo) - FR-11 */
+  async function purchasePackageDemo(accountId, packageId) {
+    const res = await request('POST', '/api/subscriptions/purchase-demo', { account_id: accountId, package_id: packageId });
+    return res.data;
+  }
+
+  /** Service packages: danh sách gói cho patient (ids 1-5) - FR-11 */
+  async function getServicePackagesForPatient() {
+    const res = await request('GET', '/api/service-packages?ids=1,2,3,4,5');
+    return res.data;
+  }
+
+  /** Payments: lịch sử thanh toán theo account (GET /api/payments/account/:id/history) - FR-12 */
+  async function getPaymentHistory(accountId, limit, offset) {
+    let path = '/api/payments/account/' + accountId + '/history';
+    const q = [];
+    if (limit != null) q.push('limit=' + limit);
+    if (offset != null) q.push('offset=' + offset);
+    if (q.length) path += '?' + q.join('&');
+    const res = await request('GET', path);
+    return res.data;
+  }
+
+  /** Notifications: danh sách thông báo theo account (GET /api/notifications/account/:id) - FR-9 */
+  async function getNotificationsByAccount(accountId, unreadOnly) {
+    let path = '/api/notifications/account/' + accountId;
+    if (unreadOnly) path += '/unread';
+    const res = await request('GET', path);
+    return res.data;
+  }
+
+  // ---------- Admin: Accounts (CRUD, role, status) ----------
+  /** Admin: danh sách tất cả tài khoản (GET /api/accounts) */
+  async function getAllAccounts() {
+    const res = await request('GET', '/api/accounts');
+    return res.data;
+  }
+
+  /** Admin: tạo tài khoản (POST /api/accounts) body: { email, password, role_id, clinic_id?, status? } */
+  async function createAccount(payload) {
+    const res = await request('POST', '/api/accounts', payload);
+    return res.data;
+  }
+
+  /** Admin: lấy tài khoản theo ID (GET /api/accounts/:id) */
+  async function getAccount(accountId) {
+    const res = await request('GET', '/api/accounts/' + accountId);
+    return res.data;
+  }
+
+  /** Admin: tài khoản theo role (GET /api/accounts/role/:role_id) */
+  async function getAccountsByRole(roleId) {
+    const res = await request('GET', '/api/accounts/role/' + roleId);
+    return res.data;
+  }
+
+  /** Admin: tài khoản theo status (GET /api/accounts/status/:status) */
+  async function getAccountsByStatus(status) {
+    const res = await request('GET', '/api/accounts/status/' + encodeURIComponent(status));
+    return res.data;
+  }
+
+  /** Admin: cập nhật tài khoản (PUT /api/accounts/:id) */
+  async function updateAccountById(accountId, payload) {
+    const res = await request('PUT', '/api/accounts/' + accountId, payload);
+    return res.data;
+  }
+
+  /** Admin: cập nhật trạng thái tài khoản (PUT /api/accounts/:id/status) body: { status } */
+  async function updateAccountStatus(accountId, status) {
+    const res = await request('PUT', '/api/accounts/' + accountId + '/status', { status });
+    return res.data;
+  }
+
+  /** Admin: đổi mật khẩu tài khoản (PUT /api/accounts/:id/password) body: { new_password_hash } */
+  async function updateAccountPassword(accountId, newPasswordHash) {
+    const res = await request('PUT', '/api/accounts/' + accountId + '/password', { new_password_hash: newPasswordHash });
+    return res.data;
+  }
+
+  /** Admin: xóa tài khoản (DELETE /api/accounts/:id) */
+  async function deleteAccount(accountId) {
+    const res = await request('DELETE', '/api/accounts/' + accountId);
+    return res.data;
+  }
+
+  /** Admin: thống kê tài khoản (GET /api/accounts/stats) */
+  async function getAccountStats(roleId, status) {
+    let path = '/api/accounts/stats';
+    const q = [];
+    if (roleId != null) q.push('role_id=' + roleId);
+    if (status) q.push('status=' + encodeURIComponent(status));
+    if (q.length) path += '?' + q.join('&');
+    const res = await request('GET', path);
+    return res.data;
+  }
+
+  // ---------- Admin: Roles ----------
+  /** Admin: danh sách roles (GET /api/roles) */
+  async function getAllRoles() {
+    const res = await request('GET', '/api/roles');
+    return res.data;
+  }
+
+  /** Admin: tạo role (POST /api/roles) body: { role_name } */
+  async function createRole(roleName) {
+    const res = await request('POST', '/api/roles', { role_name: roleName });
+    return res.data;
+  }
+
+  /** Admin: cập nhật role (PUT /api/roles/:id) body: { role_name } */
+  async function updateRole(roleId, roleName) {
+    const res = await request('PUT', '/api/roles/' + roleId, { role_name: roleName });
+    return res.data;
+  }
+
+  /** Admin: xóa role (DELETE /api/roles/:id) */
+  async function deleteRole(roleId) {
+    const res = await request('DELETE', '/api/roles/' + roleId);
+    return res.data;
+  }
+
+  // ---------- Admin: Clinics (verify/reject/approve/suspend) ----------
+  /** Admin: danh sách phòng khám có lọc (GET /api/clinics?status=) */
+  async function listClinics(status) {
+    let path = '/api/clinics';
+    if (status) path += '?status=' + encodeURIComponent(status);
+    const res = await request('GET', path);
+    return res.data;
+  }
+
+  /** Admin: phòng khám chờ duyệt (GET /api/clinics/pending) */
+  async function getPendingClinics() {
+    const res = await request('GET', '/api/clinics/pending');
+    return res.data;
+  }
+
+  /** Admin: duyệt phòng khám (PUT /api/clinics/:id/verify) body: { admin_notes? } */
+  async function verifyClinic(clinicId, adminNotes) {
+    const res = await request('PUT', '/api/clinics/' + clinicId + '/verify', { admin_notes: adminNotes || '' });
+    return res.data;
+  }
+
+  /** Admin: từ chối phòng khám (PUT /api/clinics/:id/reject) body: { rejection_reason? } */
+  async function rejectClinic(clinicId, rejectionReason) {
+    const res = await request('PUT', '/api/clinics/' + clinicId + '/reject', { rejection_reason: rejectionReason || '' });
+    return res.data;
+  }
+
+  /** Admin: phê duyệt / gỡ treo (PUT /api/clinics/:id/approve) body: { admin_notes? } */
+  async function approveClinic(clinicId, adminNotes) {
+    const res = await request('PUT', '/api/clinics/' + clinicId + '/approve', { admin_notes: adminNotes || '' });
+    return res.data;
+  }
+
+  /** Admin: treo phòng khám (PUT /api/clinics/:id/suspend) body: { suspension_reason? } */
+  async function suspendClinic(clinicId, suspensionReason) {
+    const res = await request('PUT', '/api/clinics/' + clinicId + '/suspend', { suspension_reason: suspensionReason || '' });
+    return res.data;
+  }
+
+  /** Admin: xóa phòng khám (DELETE /api/clinics/:id) */
+  async function deleteClinic(clinicId) {
+    const res = await request('DELETE', '/api/clinics/' + clinicId);
+    return res.data;
+  }
+
+  /** Admin: thống kê phòng khám (GET /api/clinics/stats?verification_status=) */
+  async function getClinicStats(verificationStatus) {
+    let path = '/api/clinics/stats';
+    if (verificationStatus) path += '?verification_status=' + encodeURIComponent(verificationStatus);
+    const res = await request('GET', path);
+    return res.data;
+  }
+
+  // ---------- Admin: AI Model Versions ----------
+  /** Admin: danh sách phiên bản AI (GET /api/ai-model-versions) */
+  async function getAllAiModelVersions() {
+    const res = await request('GET', '/api/ai-model-versions');
+    return res.data;
+  }
+
+  /** Admin: phiên bản đang active (GET /api/ai-model-versions/active) */
+  async function getActiveAiModels() {
+    const res = await request('GET', '/api/ai-model-versions/active');
+    return res.data;
+  }
+
+  /** Admin: kích hoạt phiên bản (PUT /api/ai-model-versions/:id/activate) */
+  async function activateAiModel(modelVersionId) {
+    const res = await request('PUT', '/api/ai-model-versions/' + modelVersionId + '/activate', null);
+    return res.data;
+  }
+
+  /** Admin: tắt phiên bản (PUT /api/ai-model-versions/:id/deactivate) */
+  async function deactivateAiModel(modelVersionId) {
+    const res = await request('PUT', '/api/ai-model-versions/' + modelVersionId + '/deactivate', null);
+    return res.data;
+  }
+
+  /** Admin: tạo phiên bản (POST /api/ai-model-versions) */
+  async function createAiModelVersion(payload) {
+    const res = await request('POST', '/api/ai-model-versions', payload);
+    return res.data;
+  }
+
+  /** Admin: cập nhật threshold (PUT /api/ai-model-versions/:id/threshold) body: { threshold_config } */
+  async function updateAiModelThreshold(modelVersionId, thresholdConfig) {
+    const res = await request('PUT', '/api/ai-model-versions/' + modelVersionId + '/threshold', { threshold_config: thresholdConfig });
+    return res.data;
+  }
+
+  /** Admin: xóa phiên bản (DELETE /api/ai-model-versions/:id) */
+  async function deleteAiModelVersion(modelVersionId) {
+    const res = await request('DELETE', '/api/ai-model-versions/' + modelVersionId);
+    return res.data;
+  }
+
+  /** Admin: thống kê AI models (GET /api/ai-model-versions/stats) */
+  async function getAiModelStats() {
+    const res = await request('GET', '/api/ai-model-versions/stats');
+    return res.data;
+  }
+
+  // ---------- Admin: Dashboard & Analytics ----------
+  /** Admin: dashboard tổng quan (GET /api/admin/dashboard) */
+  async function getAdminDashboard() {
+    const res = await request('GET', '/api/admin/dashboard');
+    return res.data;
+  }
+
+  /** Admin: analytics ảnh (GET /api/admin/analytics/images?days=) */
+  async function getAdminImageAnalytics(days) {
+    let path = '/api/admin/analytics/images';
+    if (days != null) path += '?days=' + days;
+    const res = await request('GET', path);
+    return res.data;
+  }
+
+  /** Admin: analytics phân bố rủi ro (GET /api/admin/analytics/risk-distribution) */
+  async function getAdminRiskDistribution() {
+    const res = await request('GET', '/api/admin/analytics/risk-distribution');
+    return res.data;
+  }
+
+  /** Admin: analytics doanh thu (GET /api/admin/analytics/revenue?days=) */
+  async function getAdminRevenueAnalytics(days) {
+    let path = '/api/admin/analytics/revenue';
+    if (days != null && days !== '') path += '?days=' + (days === 'all' ? '0' : days);
+    const res = await request('GET', path);
+    return res.data;
+  }
+
+  /** Admin: analytics tỷ lệ lỗi (GET /api/admin/analytics/error-rates) */
+  async function getAdminErrorRateAnalytics() {
+    const res = await request('GET', '/api/admin/analytics/error-rates');
+    return res.data;
+  }
+
+  /** Admin: cấu hình AI (GET /api/admin/ai-config) */
+  async function getAdminAiConfig() {
+    const res = await request('GET', '/api/admin/ai-config');
+    return res.data;
+  }
+
+  /** Admin: cập nhật cấu hình AI (PUT /api/admin/ai-config) */
+  async function updateAdminAiConfig(payload) {
+    const res = await request('PUT', '/api/admin/ai-config', payload);
+    return res.data;
+  }
+
+  /** Admin: cài đặt bảo mật (GET /api/admin/privacy-settings) */
+  async function getAdminPrivacySettings() {
+    const res = await request('GET', '/api/admin/privacy-settings');
+    return res.data;
+  }
+
+  /** Admin: cập nhật cài đặt bảo mật (PUT /api/admin/privacy-settings) */
+  async function updateAdminPrivacySettings(payload) {
+    const res = await request('PUT', '/api/admin/privacy-settings', payload);
+    return res.data;
+  }
+
+  /** Admin: chính sách thông báo (GET /api/admin/communication-policies) */
+  async function getAdminCommunicationPolicies() {
+    const res = await request('GET', '/api/admin/communication-policies');
+    return res.data;
+  }
+
+  /** Admin: cập nhật chính sách thông báo (PUT /api/admin/communication-policies/:type) */
+  async function updateAdminCommunicationPolicy(notificationType, payload) {
+    const res = await request('PUT', '/api/admin/communication-policies/' + encodeURIComponent(notificationType), payload);
+    return res.data;
+  }
+
   window.AuraAPI = {
     get: (path) => request('GET', path),
     post: (path, body) => request('POST', path, body),
@@ -360,6 +756,7 @@
     register,
     forgotPassword,
     resetPassword,
+    uploadFile,
     getPatientByAccount,
     getImagesByPatient,
     getImageStatsByPatient,
@@ -370,6 +767,7 @@
     getPatient,
     getDoctorByAccount,
     getDoctorPerformance,
+    getDoctorPatients,
     createDoctor,
     updateDoctor,
     searchPatients,
@@ -382,8 +780,18 @@
     getReportsByDoctor,
     createMedicalReport,
     getConversationsByDoctor,
+    getConversationsByPatient,
+    getDoctorsWhoReviewedPatient,
+    createConversation,
     getAnalysis,
     getPatientAnalyses,
+    getPatientTrend,
+    getAllResults,
+    getAllAnnotations,
+    getResultsByAnalysis,
+    getAnnotationByAnalysis,
+    getCompletedAnalyses,
+    getRetinalImage,
     getMessagesByConversation,
     sendMessage,
     getClinic,
@@ -400,5 +808,51 @@
     exportClinicStatistics,
     getSubscriptionsByAccount,
     getActiveSubscription,
+    getAccountCredits,
+    purchasePackageDemo,
+    getServicePackagesForPatient,
+    getPaymentHistory,
+    getNotificationsByAccount,
+    getAllAccounts,
+    createAccount,
+    getAccount,
+    getAccountsByRole,
+    getAccountsByStatus,
+    updateAccountById,
+    updateAccountStatus,
+    updateAccountPassword,
+    deleteAccount,
+    getAccountStats,
+    getAllRoles,
+    createRole,
+    updateRole,
+    deleteRole,
+    listClinics,
+    getPendingClinics,
+    verifyClinic,
+    rejectClinic,
+    approveClinic,
+    suspendClinic,
+    deleteClinic,
+    getClinicStats,
+    getAllAiModelVersions,
+    getActiveAiModels,
+    activateAiModel,
+    deactivateAiModel,
+    createAiModelVersion,
+    updateAiModelThreshold,
+    deleteAiModelVersion,
+    getAiModelStats,
+    getAdminDashboard,
+    getAdminImageAnalytics,
+    getAdminRiskDistribution,
+    getAdminRevenueAnalytics,
+    getAdminErrorRateAnalytics,
+    getAdminAiConfig,
+    updateAdminAiConfig,
+    getAdminPrivacySettings,
+    updateAdminPrivacySettings,
+    getAdminCommunicationPolicies,
+    updateAdminCommunicationPolicy,
   };
 })();

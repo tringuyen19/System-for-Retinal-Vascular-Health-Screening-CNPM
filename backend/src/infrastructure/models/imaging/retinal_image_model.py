@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, BigInteger, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, BigInteger, String, DateTime, ForeignKey, Text
 from infrastructure.databases.base import Base
 
 class RetinalImageModel(Base):
@@ -11,7 +11,7 @@ class RetinalImageModel(Base):
     uploaded_by = Column(BigInteger, ForeignKey('accounts.account_id'), nullable=False)
     image_type = Column(String(20), nullable=False)
     eye_side = Column(String(20), nullable=False)
-    image_url = Column(String(500), nullable=False)
+    image_url = Column(Text, nullable=False)  # URL or data: base64 (long)
     upload_time = Column(DateTime, nullable=False)
     status = Column(String(20), nullable=False)
     

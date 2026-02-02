@@ -106,7 +106,8 @@ def create_message():
             conversation_id=data['conversation_id'],
             sender_type=data['sender_type'],
             sender_name=data['sender_name'],
-            content=data['content']
+            content=data['content'],
+            message_type=data.get('message_type', 'text')
         )
         
         response_schema = MessageResponseSchema()
@@ -156,6 +157,7 @@ def get_message(message_id):
 
 
 @message_bp.route('/conversation/<int:conversation_id>', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def get_messages_by_conversation(conversation_id):
     """
     Get all messages in a conversation

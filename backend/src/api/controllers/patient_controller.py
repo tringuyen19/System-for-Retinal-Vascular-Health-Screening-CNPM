@@ -209,6 +209,12 @@ def search_patients():
     security:
       - Bearer: []
     parameters:
+      - name: patient_id
+        in: query
+        required: false
+        schema:
+          type: integer
+        description: Mã bệnh nhân (exact match)
       - name: name
         in: query
         required: false
@@ -240,12 +246,14 @@ def search_patients():
               type: array
     """
     try:
+        patient_id = request.args.get('patient_id', type=int)
         name = request.args.get('name', None)
         clinic_id = request.args.get('clinic_id', type=int)
         risk_level = request.args.get('risk_level', None)
-        
-        # Call SERVICE ✅
+
+        # Call SERVICE ✅ (FR-18: mã, tên, mức rủi ro)
         patients = patient_service.search_patients(
+            patient_id=patient_id,
             name=name,
             clinic_id=clinic_id,
             risk_level=risk_level
@@ -542,8 +550,3 @@ def get_stats():
         
     except Exception as e:
         return error_response(f'Internal server error: {str(e)}', 500)
-
-
-
-
-

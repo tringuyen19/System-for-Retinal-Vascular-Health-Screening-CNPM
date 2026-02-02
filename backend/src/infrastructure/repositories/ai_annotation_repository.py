@@ -1,7 +1,12 @@
 from typing import List, Optional
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from infrastructure.databases.mssql import session
 from infrastructure.models.ai.ai_annotation_model import AiAnnotationModel
+from infrastructure.models.ai.ai_analysis_model import AiAnalysisModel
+from infrastructure.models.imaging.retinal_image_model import RetinalImageModel
+from infrastructure.models.profiles.patient_profile_model import PatientProfileModel
+from infrastructure.models.medical.doctor_review_model import DoctorReviewModel
 from domain.models.ai_annotation import AiAnnotation
 from domain.models.iai_annotation_repository import IAiAnnotationRepository
 
@@ -55,6 +60,100 @@ class AiAnnotationRepository(IAiAnnotationRepository):
             return [self._to_domain(model) for model in annotation_models]
         except Exception as e:
             raise ValueError(f'Error getting all annotations: {str(e)}')
+        finally:
+            self.session.close()
+
+    def get_all_by_doctor(self, doctor_id: int) -> List[AiAnnotation]:
+        """Get annotations for analyses that this doctor has reviewed (patient belongs to doctor)."""
+        try:
+            annotation_models = (
+                self.session.query(AiAnnotationModel)
+                .join(DoctorReviewModel, AiAnnotationModel.analysis_id == DoctorReviewModel.analysis_id)
+                .filter(DoctorReviewModel.doctor_id == doctor_id)
+                .distinct()
+                .all()
+            )
+            return [self._to_domain(model) for model in annotation_models]
+        except Exception as e:
+            raise ValueError(f'Error getting annotations by doctor: {str(e)}')
+        finally:
+            self.session.close()
+
+    def get_all_by_doctor_with_patient(self, doctor_id: int) -> List[dict]:
+        """
+        Get annotations with patient_name for doctor (for API display).
+        Bao gồm toàn bộ ai_annotations của các patient đã từng được bác sĩ này review
+        (không chỉ những analysis đã review).
+        """
+        try:
+            # Subquery: tất cả patient_id mà doctor này đã từng review
+            patient_subq = (
+                self.session.query(RetinalImageModel.patient_id)
+                .join(AiAnalysisModel, AiAnalysisModel.image_id == RetinalImageModel.image_id)
+                .join(DoctorReviewModel, DoctorReviewModel.analysis_id == AiAnalysisModel.analysis_id)
+                .filter(DoctorReviewModel.doctor_id == doctor_id)
+                .distinct()
+                .subquery()
+            )
+
+            # Main query: mọi annotation của các patient đó
+            rows = (
+                self.session.query(
+                    AiAnnotationModel.annotation_id,
+                    AiAnnotationModel.analysis_id,
+                    AiAnnotationModel.heatmap_url,
+                    AiAnnotationModel.description,
+                    PatientProfileModel.patient_name,
+                )
+                .join(AiAnalysisModel, AiAnnotationModel.analysis_id == AiAnalysisModel.analysis_id)
+                .join(RetinalImageModel, AiAnalysisModel.image_id == RetinalImageModel.image_id)
+                .join(PatientProfileModel, RetinalImageModel.patient_id == PatientProfileModel.patient_id)
+                .filter(RetinalImageModel.patient_id.in_(select(patient_subq.c.patient_id)))
+                .all()
+            )
+            return [
+                {
+                    'annotation_id': r.annotation_id,
+                    'analysis_id': r.analysis_id,
+                    'heatmap_url': r.heatmap_url,
+                    'description': r.description,
+                    'patient_name': r.patient_name or '-',
+                }
+                for r in rows
+            ]
+        except Exception as e:
+            raise ValueError(f'Error getting annotations by doctor with patient: {str(e)}')
+        finally:
+            self.session.close()
+
+    def get_all_with_patient(self) -> List[dict]:
+        """Get all annotations with patient_name (for Admin API display)."""
+        try:
+            rows = (
+                self.session.query(
+                    AiAnnotationModel.annotation_id,
+                    AiAnnotationModel.analysis_id,
+                    AiAnnotationModel.heatmap_url,
+                    AiAnnotationModel.description,
+                    PatientProfileModel.patient_name,
+                )
+                .join(AiAnalysisModel, AiAnnotationModel.analysis_id == AiAnalysisModel.analysis_id)
+                .join(RetinalImageModel, AiAnalysisModel.image_id == RetinalImageModel.image_id)
+                .join(PatientProfileModel, RetinalImageModel.patient_id == PatientProfileModel.patient_id)
+                .all()
+            )
+            return [
+                {
+                    'annotation_id': r.annotation_id,
+                    'analysis_id': r.analysis_id,
+                    'heatmap_url': r.heatmap_url,
+                    'description': r.description,
+                    'patient_name': r.patient_name or '-',
+                }
+                for r in rows
+            ]
+        except Exception as e:
+            raise ValueError(f'Error getting all annotations with patient: {str(e)}')
         finally:
             self.session.close()
     

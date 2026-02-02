@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  if (!window.AuraAuth || !window.AuraAuth.requireLogin || !window.AuraAuth.requireLogin()) return;
+  if (!window.AuraAuth || !window.AuraAuth.requireRole || !window.AuraAuth.requireRole('Patient')) return;
 
   var user = window.AuraAuth.getUser();
   var accountId = user && user.account_id;

@@ -4,10 +4,12 @@ from api.middleware.auth_middleware import require_roles, require_role
 from infrastructure.repositories.subscription_repository import SubscriptionRepository
 from infrastructure.repositories.account_repository import AccountRepository
 from infrastructure.repositories.service_package_repository import ServicePackageRepository
+from infrastructure.repositories.payment_repository import PaymentRepository
 from infrastructure.databases.mssql import session
 from services.subscription_service import SubscriptionService
 from services.account_service import AccountService
 from services.service_package_service import ServicePackageService
+from services.payment_service import PaymentService
 from api.responses import success_response, error_response, not_found_response, validation_error_response
 from api.schemas import SubscriptionCreateRequestSchema, SubscriptionUpdateRequestSchema, SubscriptionResponseSchema
 from datetime import datetime, timedelta, date
@@ -18,11 +20,13 @@ subscription_bp = Blueprint('subscription', __name__, url_prefix='/api/subscript
 subscription_repo = SubscriptionRepository(session)
 account_repo = AccountRepository(session)
 package_repo = ServicePackageRepository(session)
+payment_repo = PaymentRepository(session)
 
 # Initialize SERVICES (Business Logic Layer) ✅
 subscription_service = SubscriptionService(subscription_repo)
 account_service = AccountService(account_repo)
 package_service = ServicePackageService(package_repo)
+payment_service = PaymentService(payment_repo)
 
 
 @subscription_bp.route('/health', methods=['GET'])
@@ -37,6 +41,73 @@ def health_check():
         description: Service is healthy
     """
     return success_response({"status": "healthy"}, "Subscription service is running")
+
+
+# FR-11: Patient mua gói demo (PTT chuyển khoản) - package_id 1-5
+PATIENT_PACKAGE_IDS = [1, 2, 3, 4, 5]
+
+
+@subscription_bp.route('/purchase-demo', methods=['POST'])
+@require_roles(['Patient', 'Doctor', 'Admin', 'ClinicManager'])
+def purchase_package_demo():
+    """
+    Mua gói dịch vụ demo (FR-11): tạo subscription + payment PTT chuyển khoản (demo, chưa chuyển thật).
+    Chỉ cho phép package_id từ 1-5.
+    """
+    try:
+        data = request.get_json() or {}
+        account_id = data.get('account_id')
+        package_id = data.get('package_id')
+        if account_id is None or package_id is None:
+            return error_response('account_id and package_id are required', 400)
+        account_id = int(account_id)
+        package_id = int(package_id)
+        if package_id not in PATIENT_PACKAGE_IDS:
+            return error_response('Chỉ được chọn gói có id từ 1 đến 5', 400)
+        account = account_service.get_account_by_id(account_id)
+        if not account:
+            return not_found_response('Account not found')
+        package = package_service.get_package_by_id(package_id)
+        if not package:
+            return not_found_response('Service package not found')
+        # Mỗi gói mới: remaining_credits = image_limit của gói đó. Tổng remaining = tổng tất cả gói active - số lần đã up ảnh.
+        remaining_credits = package.image_limit or 0
+        start_date = date.today()
+        end_date = start_date + timedelta(days=package.duration_days)
+        subscription = subscription_service.create_subscription(
+            account_id=account_id,
+            package_id=package_id,
+            start_date=start_date,
+            end_date=end_date,
+            remaining_credits=remaining_credits,
+            status='active'
+        )
+        if not subscription:
+            return error_response('Failed to create subscription', 500)
+        amount = float(package.price)
+        payment = payment_service.create_payment(
+            subscription_id=subscription.subscription_id,
+            amount=amount,
+            payment_method='bank_transfer',
+            status='completed'
+        )
+        # Tổng remaining = sum(remaining_credits của tất cả gói active)
+        total_remaining = subscription_service.get_remaining_credits(account_id)
+        return success_response({
+            'subscription': SubscriptionResponseSchema().dump(subscription),
+            'payment': {
+                'payment_id': payment.payment_id,
+                'subscription_id': payment.subscription_id,
+                'amount': float(payment.amount),
+                'payment_method': payment.payment_method,
+                'status': payment.status,
+            },
+            'remaining_credits': total_remaining,
+        }, 'Mua gói thành công (demo PTT chuyển khoản).', 201)
+    except ValueError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
 
 
 @subscription_bp.route('', methods=['POST'])

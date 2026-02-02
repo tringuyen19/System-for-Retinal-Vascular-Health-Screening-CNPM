@@ -1,7 +1,8 @@
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
-from api.middleware.auth_middleware import require_roles, require_role
+from api.middleware.auth_middleware import require_roles, require_role, get_jwt_identity, get_current_user_role_name
 from infrastructure.repositories.ai_result_repository import AiResultRepository
+from infrastructure.repositories.doctor_profile_repository import DoctorProfileRepository
 from infrastructure.repositories.ai_analysis_repository import AiAnalysisRepository
 from infrastructure.repositories.notification_repository import NotificationRepository
 from infrastructure.repositories.retinal_image_repository import RetinalImageRepository
@@ -18,6 +19,7 @@ result_repo = AiResultRepository(session)
 analysis_repo = AiAnalysisRepository(session)
 notification_repo = NotificationRepository(session)
 image_repo = RetinalImageRepository(session)
+doctor_repo = DoctorProfileRepository(session)
 
 # Initialize SERVICES with dependency injection ✅
 result_service = AiResultService(
@@ -155,6 +157,7 @@ def get_result(result_id):
 
 
 @ai_result_bp.route('/analysis/<int:analysis_id>', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def get_results_by_analysis(analysis_id):
     """
     Get all results for an analysis
@@ -348,7 +351,7 @@ def get_high_confidence_results():
 @require_roles(['Doctor', 'Admin'])
 def get_all_results():
     """
-    Get all results
+    Get all results. Doctor: only results for analyses they reviewed (their patients). Admin: all.
     ---
     tags:
       - AI Result
@@ -359,16 +362,18 @@ def get_all_results():
         description: List of all results
     """
     try:
-        results = result_service.list_all_results()
+        role_name = get_current_user_role_name()
+        if role_name == 'Doctor':
+            account_id_str = get_jwt_identity()
+            account_id = int(account_id_str) if account_id_str else None
+            doctor = doctor_repo.get_by_account_id(account_id) if account_id else None
+            results = result_service.get_results_by_doctor_with_patient(doctor.doctor_id) if doctor else []
+        else:
+            results = result_service.list_all_results_with_patient()
         
         return success_response({
             'count': len(results),
-            'results': [{
-                'result_id': r.result_id,
-                'analysis_id': r.analysis_id,
-                'disease_type': r.disease_type,
-                'risk_level': r.risk_level
-            } for r in results]
+            'results': results
         })
         
     except Exception as e:

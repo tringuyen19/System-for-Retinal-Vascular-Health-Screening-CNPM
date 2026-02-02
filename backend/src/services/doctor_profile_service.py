@@ -89,6 +89,14 @@ class DoctorProfileService:
             return False
         return not self.repository.check_license_exists(license_number)
     
+    def get_patients_for_doctor(self, doctor_id: int) -> List[dict]:
+        """
+        Get list of patients assigned to this doctor via flow: Patient uploads image -> AI analyzes -> Doctor reviews.
+        Returns list of { patient_id, patient_name }.
+        """
+        self.get_doctor_by_id(doctor_id)  # ensure doctor exists
+        return self.review_repository.get_patients_by_doctor(doctor_id)
+
     def get_performance_summary(self, doctor_id: int) -> dict:
         """
         Get performance summary for a doctor (FR-21)
@@ -126,10 +134,12 @@ class DoctorProfileService:
             if status in status_counts:
                 status_counts[status] += 1
         
-        # Get unique patients (optimized - use set comprehension)
+        # Get unique patients: from conversations, reports, and from review flow (patient upload -> AI analysis -> doctor review)
         unique_patients = set()
         unique_patients.update(conv.patient_id for conv in conversations)
         unique_patients.update(report.patient_id for report in reports)
+        patients_from_reviews = self.review_repository.get_patients_by_doctor(doctor_id)
+        unique_patients.update(p["patient_id"] for p in patients_from_reviews)
         
         total_reviews = len(reviews)
         approved_count = status_counts['approved']

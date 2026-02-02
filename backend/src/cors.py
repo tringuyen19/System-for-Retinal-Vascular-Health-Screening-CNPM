@@ -7,7 +7,7 @@ def init_cors(app):
         resources={r"/*": {
             "origins": "*",
             "allow_headers": ["Content-Type", "Authorization"],
-            "expose_headers": ["Content-Type"],
+            "expose_headers": ["Content-Type", "Content-Disposition"],
         }},
     )
     return app

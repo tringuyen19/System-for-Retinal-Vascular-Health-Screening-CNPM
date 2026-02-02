@@ -1,7 +1,8 @@
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
-from api.middleware.auth_middleware import require_roles, require_role
+from api.middleware.auth_middleware import require_roles, require_role, get_jwt_identity, get_current_user_role_name
 from infrastructure.repositories.ai_annotation_repository import AiAnnotationRepository
+from infrastructure.repositories.doctor_profile_repository import DoctorProfileRepository
 from infrastructure.repositories.ai_analysis_repository import AiAnalysisRepository
 from infrastructure.databases.mssql import session
 from services.ai_annotation_service import AiAnnotationService
@@ -14,6 +15,7 @@ ai_annotation_bp = Blueprint('ai_annotation', __name__, url_prefix='/api/ai-anno
 # Initialize repositories (only for service initialization)
 annotation_repo = AiAnnotationRepository(session)
 analysis_repo = AiAnalysisRepository(session)
+doctor_repo = DoctorProfileRepository(session)
 
 # Initialize SERVICES (Business Logic Layer) ✅
 annotation_service = AiAnnotationService(annotation_repo)
@@ -138,6 +140,7 @@ def get_annotation(annotation_id):
 
 
 @ai_annotation_bp.route('/analysis/<int:analysis_id>', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin'])
 def get_annotation_by_analysis(analysis_id):
     """
     Get annotation for a specific analysis
@@ -172,7 +175,7 @@ def get_annotation_by_analysis(analysis_id):
 @require_roles(['Doctor', 'Admin'])
 def get_all_annotations():
     """
-    Get all annotations
+    Get all annotations. Doctor: only annotations for analyses they reviewed (their patients). Admin: all.
     ---
     tags:
       - AI Annotation
@@ -183,16 +186,18 @@ def get_all_annotations():
         description: List of all annotations
     """
     try:
-        annotations = annotation_service.get_all_annotations()
+        role_name = get_current_user_role_name()
+        if role_name == 'Doctor':
+            account_id_str = get_jwt_identity()
+            account_id = int(account_id_str) if account_id_str else None
+            doctor = doctor_repo.get_by_account_id(account_id) if account_id else None
+            annotations = annotation_service.get_annotations_by_doctor_with_patient(doctor.doctor_id) if doctor else []
+        else:
+            annotations = annotation_service.get_all_annotations_with_patient()
         
         return success_response({
             'count': len(annotations),
-            'annotations': [{
-                'annotation_id': a.annotation_id,
-                'analysis_id': a.analysis_id,
-                'heatmap_url': a.heatmap_url,
-                'description': a.description
-            } for a in annotations]
+            'annotations': annotations
         })
         
     except Exception as e:

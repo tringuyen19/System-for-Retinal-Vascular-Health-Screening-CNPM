@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  if (!window.AuraAuth || !window.AuraAuth.requireLogin || !window.AuraAuth.requireLogin()) return;
+  if (!window.AuraAuth || !window.AuraAuth.requireRole || !window.AuraAuth.requireRole('Patient')) return;
 
   var user = window.AuraAuth.getUser();
   var accountId = user && user.account_id;
@@ -62,7 +62,7 @@
       { key: 'image_type', label: 'Loại ảnh' },
       { key: 'eye_side', label: 'Bên mắt' },
       { key: 'status', label: 'Trạng thái' },
-      { key: 'created_at', label: 'Ngày tải', render: function (v) { return v ? v.slice(0, 10) : '-'; } },
+      { key: 'upload_time', label: 'Ngày tải', render: function (v, row) { var t = (row && row.upload_time) || v; return t ? (typeof t === 'string' ? t.slice(0, 10) : t) : '-'; } },
       { key: 'image_url', label: 'Xem', render: function (v, row) {
         if (!v) return '-';
         return '<a href="' + (v.indexOf('data:') === 0 ? v : v) + '" target="_blank" class="btn btn-sm btn-outline-primary">Xem</a>';

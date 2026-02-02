@@ -143,6 +143,7 @@ def get_notification(notification_id):
 
 
 @notification_bp.route('/account/<int:account_id>', methods=['GET'])
+@require_roles(['Patient', 'Doctor', 'Admin', 'ClinicManager'])
 def get_notifications_by_account(account_id):
     """
     Get all notifications for an account

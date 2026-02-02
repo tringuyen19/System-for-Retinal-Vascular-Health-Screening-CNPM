@@ -70,24 +70,34 @@ class SubscriptionService:
         return self.repository.get_by_account(account_id)
     
     def get_active_subscription(self, account_id: int) -> Optional[Subscription]:
-        """Get active subscription for an account"""
+        """Get one active subscription for an account (newest by subscription_id)"""
         return self.repository.get_active_by_account(account_id)
+    
+    def get_active_subscriptions(self, account_id: int) -> List[Subscription]:
+        """Get all active subscriptions for an account (để tính tổng remaining = sum image_limit các gói - số lần đã up ảnh)"""
+        all_subs = self.repository.get_by_account(account_id)
+        return [s for s in all_subs if s.status == 'active']
     
     def get_remaining_credits(self, account_id: int) -> int:
         """
-        Get remaining analysis credits for an account (FR-12)
-        
-        Args:
-            account_id: Account ID
-            
-        Returns:
-            int: Remaining credits (0 if no active subscription)
+        Get remaining analysis credits for an account (FR-12).
+        remaining_credits = tổng image_limit các gói đã mua - số lần đã up ảnh = sum(remaining_credits của tất cả gói active).
         """
-        subscription = self.get_active_subscription(account_id)
-        if not subscription:
-            return 0
-        
-        return subscription.remaining_credits
+        active_subs = self.get_active_subscriptions(account_id)
+        return sum(s.remaining_credits for s in active_subs)
+    
+    def deduct_credit_for_account(self, account_id: int, amount: int = 1) -> Optional[Subscription]:
+        """
+        Trừ credit từ một gói active của account (ưu tiên gói cũ trước - subscription_id nhỏ nhất có remaining_credits >= amount).
+        Dùng khi patient upload ảnh: trừ 1 từ pool tổng (một trong các gói active).
+        """
+        active_subs = self.get_active_subscriptions(account_id)
+        # Ưu tiên gói cũ trước (subscription_id tăng dần)
+        active_subs_sorted = sorted(active_subs, key=lambda s: s.subscription_id)
+        for sub in active_subs_sorted:
+            if sub.remaining_credits >= amount:
+                return self.deduct_credit(sub.subscription_id, amount)
+        return None
     
     def get_subscriptions_by_status(self, status: str) -> List[Subscription]:
         """Get subscriptions by status"""
@@ -143,16 +153,16 @@ class SubscriptionService:
         return self.repository.cancel_subscription(subscription_id)
     
     def check_credits(self, account_id: int) -> dict:
-        """Check credits for an account"""
-        subscription = self.get_active_subscription(account_id)
-        if not subscription:
-            return {'has_credits': False, 'remaining_credits': 0, 'status': 'no_active_subscription'}
-        
+        """Check credits for an account (tổng remaining của tất cả gói active)"""
+        total = self.get_remaining_credits(account_id)
+        active_subs = self.get_active_subscriptions(account_id)
+        status = 'active' if active_subs else 'no_active_subscription'
+        expires_at = max((s.end_date for s in active_subs), default=None) if active_subs else None
         return {
-            'has_credits': subscription.remaining_credits > 0,
-            'remaining_credits': subscription.remaining_credits,
-            'status': subscription.status,
-            'expires_at': subscription.end_date
+            'has_credits': total > 0,
+            'remaining_credits': total,
+            'status': status,
+            'expires_at': expires_at
         }
     
     def update_subscription(self, subscription_id: int, **kwargs) -> Optional[Subscription]:

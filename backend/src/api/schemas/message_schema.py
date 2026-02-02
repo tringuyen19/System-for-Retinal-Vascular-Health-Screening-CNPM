@@ -6,7 +6,7 @@ class MessageCreateRequestSchema(Schema):
     sender_type = fields.Str(required=True, metadata={'description': "Sender type (patient/doctor)"})
     sender_name = fields.Str(required=True, metadata={'description': "Sender's name"})
     content = fields.Str(required=True, metadata={'description': "Message content"})
-    message_type = fields.Str(required=True, metadata={'description': "Message type (text/image/file)"})
+    message_type = fields.Str(load_default='text', metadata={'description': "Message type (text/image/file)"})
 
 class MessageResponseSchema(Schema):
     """Schema for Message response"""

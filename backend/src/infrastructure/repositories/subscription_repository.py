@@ -57,7 +57,7 @@ class SubscriptionRepository(ISubscriptionRepository):
         try:
             sub_model = self.session.query(SubscriptionModel).filter_by(
                 account_id=account_id, status='active'
-            ).first()
+            ).order_by(SubscriptionModel.subscription_id.desc()).first()
             return self._to_domain(sub_model) if sub_model else None
         except Exception as e:
             raise ValueError(f'Error getting active subscription: {str(e)}')

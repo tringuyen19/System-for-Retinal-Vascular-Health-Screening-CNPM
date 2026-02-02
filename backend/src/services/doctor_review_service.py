@@ -1,18 +1,22 @@
 """
 Doctor Review Service - Business Logic Layer
-Handles doctor review and validation of AI results
+Handles doctor review and validation of AI results (FR-15, FR-16)
 """
 
 from typing import List, Optional
 from datetime import datetime
 from domain.models.doctor_review import DoctorReview
+from domain.models.ai_analysis import AiAnalysis
 from domain.models.idoctor_review_repository import IDoctorReviewRepository
+from domain.models.iai_analysis_repository import IAiAnalysisRepository
 from domain.exceptions import NotFoundException, ValidationException
 
 
 class DoctorReviewService:
-    def __init__(self, repository: IDoctorReviewRepository):
+    def __init__(self, repository: IDoctorReviewRepository, analysis_repository: Optional[IAiAnalysisRepository] = None):
         self.repository = repository
+        # Optional dependency: used for listing analyses that still need a doctor review (FR-15)
+        self.analysis_repository = analysis_repository
     
     def create_review(self, analysis_id: int, doctor_id: int, 
                      validation_status: str, comment: Optional[str] = None) -> DoctorReview:
@@ -73,9 +77,19 @@ class DoctorReviewService:
         """Get reviews by validation status"""
         return self.repository.get_by_status(validation_status)
     
-    def get_pending_reviews(self) -> List[DoctorReview]:
-        """Get pending reviews"""
-        return self.repository.get_pending_reviews()
+    def get_pending_reviews(self) -> List[AiAnalysis]:
+        """
+        Get analyses that are completed but have NOT been reviewed by any doctor yet.
+        This powers the "Cần duyệt" list for FR-15.
+        """
+        if not self.analysis_repository:
+            # Fallback: no analysis repository injected -> no pending list
+            return []
+        return self.analysis_repository.get_completed_without_review()
+
+    def get_doctors_who_reviewed_patient(self, patient_id: int) -> List[dict]:
+        """Get list of doctors who reviewed this patient's analyses (FR-10: patient can chat with them)."""
+        return self.repository.get_doctors_by_patient(patient_id)
     
     def approve_review(self, review_id: int, comment: Optional[str] = None) -> Optional[DoctorReview]:
         """Approve review"""

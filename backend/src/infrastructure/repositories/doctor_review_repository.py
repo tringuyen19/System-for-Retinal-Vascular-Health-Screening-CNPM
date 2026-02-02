@@ -3,6 +3,10 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from infrastructure.databases.mssql import session
 from infrastructure.models.medical.doctor_review_model import DoctorReviewModel
+from infrastructure.models.ai.ai_analysis_model import AiAnalysisModel
+from infrastructure.models.imaging.retinal_image_model import RetinalImageModel
+from infrastructure.models.profiles.doctor_profile_model import DoctorProfileModel
+from infrastructure.models.profiles.patient_profile_model import PatientProfileModel
 from domain.models.doctor_review import DoctorReview
 from domain.models.idoctor_review_repository import IDoctorReviewRepository
 
@@ -159,5 +163,44 @@ class DoctorReviewRepository(IDoctorReviewRepository):
             return self.session.query(DoctorReviewModel).filter_by(validation_status=validation_status).count()
         except Exception as e:
             raise ValueError(f'Error counting reviews by status: {str(e)}')
+        finally:
+            self.session.close()
+
+    def get_doctors_by_patient(self, patient_id: int) -> List[dict]:
+        """Get distinct doctors who reviewed this patient's analyses (FR-10: patient chat with assigned doctor)."""
+        try:
+            rows = (
+                self.session.query(DoctorProfileModel.doctor_id, DoctorProfileModel.doctor_name)
+                .join(DoctorReviewModel, DoctorReviewModel.doctor_id == DoctorProfileModel.doctor_id)
+                .join(AiAnalysisModel, AiAnalysisModel.analysis_id == DoctorReviewModel.analysis_id)
+                .join(RetinalImageModel, RetinalImageModel.image_id == AiAnalysisModel.image_id)
+                .filter(RetinalImageModel.patient_id == patient_id)
+                .distinct()
+                .all()
+            )
+            return [{"doctor_id": r.doctor_id, "doctor_name": r.doctor_name} for r in rows]
+        except Exception as e:
+            raise ValueError(f'Error getting doctors by patient: {str(e)}')
+        finally:
+            self.session.close()
+
+    def get_patients_by_doctor(self, doctor_id: int) -> List[dict]:
+        """
+        Get distinct patients of this doctor via flow: DoctorReview -> AiAnalysis -> RetinalImage -> patient_id.
+        Patient uploads image -> AI analyzes -> doctor reviews analysis -> these are the doctor's patients.
+        """
+        try:
+            rows = (
+                self.session.query(RetinalImageModel.patient_id, PatientProfileModel.patient_name)
+                .join(AiAnalysisModel, AiAnalysisModel.image_id == RetinalImageModel.image_id)
+                .join(DoctorReviewModel, DoctorReviewModel.analysis_id == AiAnalysisModel.analysis_id)
+                .join(PatientProfileModel, PatientProfileModel.patient_id == RetinalImageModel.patient_id)
+                .filter(DoctorReviewModel.doctor_id == doctor_id)
+                .group_by(RetinalImageModel.patient_id, PatientProfileModel.patient_name)
+                .all()
+            )
+            return [{"patient_id": r.patient_id, "patient_name": r.patient_name or ""} for r in rows]
+        except Exception as e:
+            raise ValueError(f'Error getting patients by doctor: {str(e)}')
         finally:
             self.session.close()

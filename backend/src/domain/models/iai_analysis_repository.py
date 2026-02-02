@@ -62,6 +62,14 @@ class IAiAnalysisRepository(ABC):
         pass
     
     @abstractmethod
+    def get_completed_without_review(self) -> List[AiAnalysis]:
+        """
+        Get completed analyses that have not been reviewed by any doctor yet.
+        Used for FR-15 pending review list.
+        """
+        pass
+    
+    @abstractmethod
     def get_by_patient_id(self, patient_id: int, limit: int = 50, offset: int = 0,
                          start_date: Optional[date] = None, end_date: Optional[date] = None) -> List[AiAnalysis]:
         """

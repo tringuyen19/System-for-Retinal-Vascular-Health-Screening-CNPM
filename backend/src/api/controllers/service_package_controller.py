@@ -198,13 +198,20 @@ def get_all_packages():
     try:
         min_price = request.args.get('min_price', type=float)
         max_price = request.args.get('max_price', type=float)
+        ids_param = request.args.get('ids')  # e.g. "1,2,3,4,5" for FR-11 patient packages
+        package_ids = None
+        if ids_param:
+            try:
+                package_ids = [int(x.strip()) for x in ids_param.split(',') if x.strip()]
+            except ValueError:
+                pass
         
+        all_packages = package_service.list_all_packages()
+        if package_ids:
+            all_packages = [p for p in all_packages if getattr(p, 'package_id', p.id if hasattr(p, 'id') else None) in package_ids]
         if min_price is not None and max_price is not None:
-            # Filter by price range (need to add to service or filter in controller)
-            all_packages = package_service.list_all_packages()
-            packages = [p for p in all_packages if min_price <= float(p.price) <= max_price]
-        else:
-            packages = package_service.list_all_packages()
+            all_packages = [p for p in all_packages if min_price <= float(p.price) <= max_price]
+        packages = all_packages
         
         return success_response({
             'count': len(packages),

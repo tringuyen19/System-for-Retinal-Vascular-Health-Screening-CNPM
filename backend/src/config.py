@@ -13,6 +13,8 @@ class Config:
     TESTING = os.environ.get('TESTING', 'False').lower() in ['true', '1']
     DATABASE_URI = os.environ.get('DATABASE_URI') or 'mssql+pymssql://sa:123@127.0.0.1:1433/RetinalHealthDB'
     CORS_HEADERS = 'Content-Type'
+    # Static uploads (served via Flask default /static/*)
+    STATIC_UPLOAD_DIR = os.environ.get('STATIC_UPLOAD_DIR') or os.path.join(os.path.dirname(__file__), 'static', 'uploads')
 
 class DevelopmentConfig(Config):
     """Development configuration."""

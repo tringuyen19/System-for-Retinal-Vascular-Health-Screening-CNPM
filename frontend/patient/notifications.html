@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard - Bệnh nhân | AURA</title>
+  <title>Thông báo | Bệnh nhân | AURA</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
   <link href="../css/style.css" rel="stylesheet">
@@ -14,17 +14,13 @@
       <a class="navbar-brand" href="../index.html">AURA</a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain"><span class="navbar-toggler-icon"></span></button>
       <div class="collapse navbar-collapse" id="navbarMain">
-        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-          <li class="nav-item"><a class="nav-link" href="../index.html">Trang chủ</a></li>
-          <li class="nav-item"><a class="nav-link" href="../login.html">Đăng nhập</a></li>
-          <li class="nav-item"><a class="nav-link" href="../register.html">Đăng ký</a></li>
-        </ul>
+        <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="dashboard.html">Dashboard</a></li></ul>
         <ul class="navbar-nav ms-auto align-items-center">
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown"><i class="bi bi-person-circle me-1"></i><span id="headerUserName">Tài khoản</span></a>
             <ul class="dropdown-menu dropdown-menu-end">
-              <li><a class="dropdown-item" href="profile.html" id="headerProfileLink">Hồ sơ</a></li>
-              <li><a class="dropdown-item" href="settings.html" id="headerSettingsLink">Cài đặt</a></li>
+              <li><a class="dropdown-item" href="profile.html">Hồ sơ</a></li>
+              <li><a class="dropdown-item" href="settings.html">Cài đặt</a></li>
               <li><hr class="dropdown-divider"></li>
               <li><a class="dropdown-item text-danger" href="#" id="headerLogout">Đăng xuất</a></li>
             </ul>
@@ -33,7 +29,6 @@
       </div>
     </div>
   </header>
-
   <div class="d-flex flex-grow-1" style="padding-top: 56px;">
     <aside class="aura-sidebar d-none d-md-flex flex-shrink-0 border-end bg-light" style="width: 250px; background-color: #f5f5f5 !important;">
       <nav class="nav flex-column p-3 w-100">
@@ -44,73 +39,26 @@
         <a class="nav-link rounded mb-1" href="analysis-results.html"><i class="bi bi-graph-up me-2"></i>Kết quả phân tích</a>
         <a class="nav-link rounded mb-1" href="reports.html"><i class="bi bi-file-earmark-text me-2"></i>Báo cáo</a>
         <a class="nav-link rounded mb-1" href="messages.html"><i class="bi bi-chat-dots me-2"></i>Tin nhắn</a>
-        <a class="nav-link rounded mb-1" href="notifications.html"><i class="bi bi-bell me-2"></i>Thông báo</a>
+        <a class="nav-link rounded mb-1 active" href="notifications.html"><i class="bi bi-bell me-2"></i>Thông báo</a>
         <a class="nav-link rounded mb-1" href="subscriptions.html"><i class="bi bi-box-seam me-2"></i>Gói dịch vụ</a>
         <hr class="my-2">
         <a class="nav-link rounded mb-1" href="profile.html"><i class="bi bi-person me-2"></i>Hồ sơ</a>
         <a class="nav-link rounded mb-1" href="settings.html"><i class="bi bi-gear me-2"></i>Cài đặt</a>
       </nav>
     </aside>
-
     <main class="flex-grow-1 p-4" style="background-color: #f5f5f5;">
       <div class="container-fluid">
-        <h1 class="h3 mb-4">Dashboard Bệnh nhân</h1>
-        <div id="dashboardError" class="alert alert-danger d-none"></div>
-        <div id="dashboardContent">
-          <div class="row g-3 mb-4">
-            <div class="col-md-4">
-              <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                  <i class="bi bi-images text-primary fs-2 mb-2"></i>
-                  <h5 class="card-title">Tổng ảnh</h5>
-                  <p class="mb-0 fs-4" id="statImages">-</p>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-4">
-              <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                  <i class="bi bi-graph-up text-success fs-2 mb-2"></i>
-                  <h5 class="card-title">Phân tích</h5>
-                  <p class="mb-0 fs-4" id="statAnalyses">-</p>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-4">
-              <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                  <i class="bi bi-file-earmark-text text-info fs-2 mb-2"></i>
-                  <h5 class="card-title">Báo cáo</h5>
-                  <p class="mb-0 fs-4" id="statReports">-</p>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="row">
-            <div class="col-lg-8 mb-4">
-              <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white"><h5 class="mb-0">Hoạt động gần đây</h5></div>
-                <div class="card-body">
-                  <div id="recentList">Đang tải...</div>
-                </div>
-              </div>
-            </div>
-            <div class="col-lg-4">
-              <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white"><h5 class="mb-0">Thao tác nhanh</h5></div>
-                <div class="card-body">
-                  <a href="upload-image.html" class="btn btn-primary w-100 mb-2"><i class="bi bi-cloud-upload me-2"></i>Upload ảnh mới</a>
-                  <a href="my-images.html" class="btn btn-outline-secondary w-100 mb-2"><i class="bi bi-images me-2"></i>Xem ảnh của tôi</a>
-                  <a href="reports.html" class="btn btn-outline-secondary w-100"><i class="bi bi-file-earmark me-2"></i>Xem báo cáo</a>
-                </div>
-              </div>
-            </div>
-          </div>
+        <h1 class="h3 mb-4">Thông báo</h1>
+        <p class="text-muted mb-4">Khuyến nghị và cảnh báo sức khỏe tự động (FR-5), kết quả phân tích và thông báo hệ thống.</p>
+        <div id="notificationsError" class="alert alert-danger d-none"></div>
+        <div id="notificationsLoading" class="text-center py-4">Đang tải...</div>
+        <div id="notificationsList" class="d-none">
+          <div id="notificationsEmpty" class="text-muted text-center py-4 d-none">Chưa có thông báo nào.</div>
+          <div id="notificationsCards"></div>
         </div>
       </div>
     </main>
   </div>
-
   <footer class="aura-footer py-3 border-top" style="background-color: #f5f5f5;">
     <div class="container-fluid"><span class="text-muted small">&copy; 2025 AURA - AI-Powered Retinal Disease Detection</span></div>
   </footer>
@@ -122,7 +70,6 @@
   <script src="../js/utils.js"></script>
   <script src="../js/components/header.js"></script>
   <script src="../js/components/sidebar.js"></script>
-  <script src="../js/components/alert.js"></script>
-  <script src="../js/pages/patient-dashboard.js"></script>
+  <script src="../js/pages/patient-notifications.js"></script>
 </body>
 </html>

@@ -238,15 +238,23 @@ def get_conversations_by_doctor(doctor_id):
             conversations = conversation_service.get_active_conversations_by_doctor(doctor_id)
         else:
             conversations = conversation_service.get_conversations_by_doctor(doctor_id)
-        
-        # Serialize response with schema
+
+        # Serialize and enrich with patient_name (FR-20: doctor sees patient name in list)
         schema = ConversationResponseSchema(many=True)
+        conv_list = schema.dump(conversations)
+        for c in conv_list:
+            try:
+                patient = patient_service.get_patient_by_id(c['patient_id'])
+                c['patient_name'] = patient.patient_name or ''
+            except Exception:
+                c['patient_name'] = ''
+
         return success_response({
             'doctor_id': doctor_id,
-            'count': len(conversations),
-            'conversations': schema.dump(conversations)
+            'count': len(conv_list),
+            'conversations': conv_list
         })
-        
+
     except Exception as e:
         return error_response(f'Internal server error: {str(e)}', 500)
 

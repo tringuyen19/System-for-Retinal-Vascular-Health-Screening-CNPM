@@ -144,12 +144,14 @@ class PatientProfileService:
         """
         return self.repository.get_by_clinic_id(clinic_id)
     
-    def search_patients(self, name: Optional[str] = None, clinic_id: Optional[int] = None, 
+    def search_patients(self, patient_id: Optional[int] = None, name: Optional[str] = None,
+                       clinic_id: Optional[int] = None,
                        risk_level: Optional[str] = None) -> List[PatientProfile]:
         """
-        Search and filter patients (FR-18)
+        Search and filter patients (FR-18): by mã (patient_id), tên (name), mức rủi ro (risk_level).
         
         Args:
+            patient_id: Mã bệnh nhân (exact match)
             name: Patient name (partial match)
             clinic_id: Filter by clinic
             risk_level: Filter by risk level (requires join with AI results)
@@ -157,39 +159,52 @@ class PatientProfileService:
         Returns:
             List[PatientProfile]: Filtered list of patients
         """
-        # If only name search, use existing method
-        if name and not clinic_id and not risk_level:
-            return self.search_patients_by_name(name)
-        
-        # If name + clinic, use new method
-        if name and clinic_id:
-            return self.repository.search_by_name_and_clinic(name, clinic_id)
-        
-        # If clinic only
-        if clinic_id and not name:
-            return self.get_assigned_patients_by_clinic(clinic_id)
-        
-        # If risk_level filter, need to join with AI results
-        # This is more complex and requires repository method
+        # Chỉ lọc theo mã bệnh nhân
+        if patient_id is not None and not name and not clinic_id and not risk_level:
+            p = self.repository.get_by_id(patient_id)
+            return [p] if p else []
+
+        # Có risk_level: dùng get_by_risk_level (hỗ trợ patient_id, name, clinic_id)
         if risk_level:
-            return self._get_patients_by_risk_level(risk_level, clinic_id, name)
-        
-        # Default: return all
+            return self._get_patients_by_risk_level(
+                risk_level, clinic_id=clinic_id, patient_name=name, patient_id=patient_id
+            )
+
+        # Chỉ tên
+        if name and not clinic_id and patient_id is None:
+            return self.search_patients_by_name(name)
+
+        # Tên + clinic hoặc tên + patient_id
+        if name and (clinic_id or patient_id is not None):
+            return self.repository.search_by_name_and_clinic(
+                name, clinic_id=clinic_id, patient_id=patient_id
+            )
+
+        # Chỉ clinic
+        if clinic_id and not name and patient_id is None:
+            return self.get_assigned_patients_by_clinic(clinic_id)
+
+        # Chỉ patient_id + clinic (không name, không risk): lấy theo clinic rồi lọc patient_id
+        if patient_id is not None and clinic_id and not name:
+            all_in_clinic = self.get_assigned_patients_by_clinic(clinic_id)
+            return [p for p in all_in_clinic if p.patient_id == patient_id]
+
+        # Mặc định: tất cả
         return self.list_all_patients()
     
-    def _get_patients_by_risk_level(self, risk_level: str, clinic_id: Optional[int] = None, 
-                                   name: Optional[str] = None) -> List[PatientProfile]:
+    def _get_patients_by_risk_level(self, risk_level: str, clinic_id: Optional[int] = None,
+                                   patient_name: Optional[str] = None,
+                                   patient_id: Optional[int] = None) -> List[PatientProfile]:
         """
         Get patients by risk level (FR-18)
         Uses optimized JOIN query in repository
         """
-        # Validate risk level
         valid_levels = ['low', 'medium', 'high', 'critical']
         if risk_level.lower() not in valid_levels:
             raise ValidationException(f"Invalid risk level. Must be one of: {valid_levels}")
-        
         return self.repository.get_by_risk_level(
             risk_level=risk_level.lower(),
             clinic_id=clinic_id,
-            patient_name=name
+            patient_name=patient_name,
+            patient_id=patient_id
         )

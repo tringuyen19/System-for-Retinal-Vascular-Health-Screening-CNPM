@@ -64,6 +64,22 @@ class AiAnnotationService:
         """Get all annotations with descriptions"""
         return self.repository.get_all_with_descriptions()
     
+    def get_all_annotations(self) -> List[AiAnnotation]:
+        """Get all annotations (used by API GET /api/ai-annotations)"""
+        return self.repository.get_all()
+
+    def get_annotations_by_doctor(self, doctor_id: int) -> List[AiAnnotation]:
+        """Get annotations for analyses that this doctor has reviewed (patient belongs to doctor)."""
+        return self.repository.get_all_by_doctor(doctor_id)
+
+    def get_annotations_by_doctor_with_patient(self, doctor_id: int) -> List[dict]:
+        """Get annotations with patient_name for doctor (for API display)."""
+        return self.repository.get_all_by_doctor_with_patient(doctor_id)
+
+    def get_all_annotations_with_patient(self) -> List[dict]:
+        """Get all annotations with patient_name (for Admin API display)."""
+        return self.repository.get_all_with_patient()
+    
     def list_all_annotations(self) -> List[AiAnnotation]:
         """Get all annotations"""
         return self.repository.get_all()

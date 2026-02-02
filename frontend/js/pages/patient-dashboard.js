@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  if (!window.AuraAuth || !window.AuraAuth.requireLogin || !window.AuraAuth.requireLogin()) return;
+  if (!window.AuraAuth || !window.AuraAuth.requireRole || !window.AuraAuth.requireRole('Patient')) return;
 
   var user = window.AuraAuth.getUser();
   var accountId = user && user.account_id;
@@ -31,7 +31,7 @@
     var items = [];
     if (images && images.length) {
       images.slice(0, 5).forEach(function (img) {
-        items.push({ text: 'Ảnh #' + (img.image_id || img.id) + ' - ' + (img.image_type || '') + ' (' + (img.created_at || '') + ')', url: 'my-images.html' });
+        items.push({ text: 'Ảnh #' + (img.image_id || img.id) + ' - ' + (img.image_type || '') + ' (' + (img.upload_time || img.created_at || '') + ')', url: 'my-images.html' });
       });
     }
     if (reports && reports.reports && reports.reports.length) {

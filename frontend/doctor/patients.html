@@ -38,8 +38,10 @@
       <nav class="nav flex-column p-3 w-100">
         <span class="text-muted small text-uppercase px-3 mb-2">Bác sĩ</span>
         <a class="nav-link rounded mb-1" href="dashboard.html"><i class="bi bi-house-door me-2"></i>Dashboard</a>
+        <a class="nav-link rounded mb-1" href="performance.html"><i class="bi bi-speedometer2 me-2"></i>Hiệu suất &amp; báo cáo</a>
         <a class="nav-link rounded mb-1 active" href="patients.html"><i class="bi bi-people me-2"></i>Bệnh nhân</a>
         <a class="nav-link rounded mb-1" href="reviews.html"><i class="bi bi-clipboard-check me-2"></i>Duyệt kết quả AI</a>
+        <a class="nav-link rounded mb-1" href="analysis-results.html"><i class="bi bi-graph-up-arrow me-2"></i>Kết quả & chú thích AI</a>
         <a class="nav-link rounded mb-1" href="create-report.html"><i class="bi bi-file-earmark-plus me-2"></i>Tạo báo cáo</a>
         <a class="nav-link rounded mb-1" href="messages.html"><i class="bi bi-chat-dots me-2"></i>Tin nhắn</a>
         <hr class="my-2">
@@ -52,10 +54,30 @@
       <div class="container-fluid">
         <h1 class="h3 mb-4">Danh sách bệnh nhân</h1>
         <div id="pageError" class="alert alert-danger d-none"></div>
+        <div class="card border-0 shadow-sm mb-3" id="myPatientsCard">
+          <div class="card-header bg-white"><h5 class="mb-0">Bệnh nhân của bạn</h5><small class="text-muted">Bệnh nhân có kết quả AI đã được bạn duyệt (patient up ảnh → AI phân tích → bạn review)</small></div>
+          <div class="card-body">
+            <div id="myPatientsLoading" class="text-center py-3">Đang tải...</div>
+            <div id="myPatientsContent" class="d-none">
+              <p class="mb-2"><strong id="myPatientsCount">0</strong> bệnh nhân</p>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                  <thead class="table-light"><tr><th>ID</th><th>Họ tên</th><th>Thao tác</th></tr></thead>
+                  <tbody id="myPatientsBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div id="myPatientsEmpty" class="text-muted py-2 d-none">Bạn chưa duyệt kết quả AI của bệnh nhân nào.</div>
+          </div>
+        </div>
         <div class="card border-0 shadow-sm mb-3">
           <div class="card-body">
             <form id="searchForm" class="row g-2">
-              <div class="col-md-4">
+              <div class="col-md-2">
+                <label class="form-label small">Mã bệnh nhân</label>
+                <input type="number" min="1" class="form-control" id="searchPatientId" name="patient_id" placeholder="ID...">
+              </div>
+              <div class="col-md-3">
                 <label class="form-label small">Tên bệnh nhân</label>
                 <input type="text" class="form-control" id="searchName" name="name" placeholder="Tìm theo tên...">
               </div>
@@ -69,7 +91,7 @@
                   <option value="critical">Nghiêm trọng</option>
                 </select>
               </div>
-              <div class="col-md-3 d-flex align-items-end">
+              <div class="col-md-4 d-flex align-items-end">
                 <button type="submit" class="btn btn-primary me-2"><i class="bi bi-search me-1"></i>Tìm kiếm</button>
                 <button type="button" class="btn btn-outline-secondary" id="btnReset">Xóa bộ lọc</button>
               </div>

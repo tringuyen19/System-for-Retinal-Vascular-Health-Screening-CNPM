@@ -20,6 +20,7 @@ from api.controllers.payment_controller import payment_bp
 from api.controllers.admin_controller import admin_bp
 from api.controllers.audit_log_controller import audit_log_bp
 from api.controllers.notification_template_controller import notification_template_bp
+from api.controllers.upload_controller import upload_bp
 
 def register_routes(app):
     """Register all API blueprints"""
@@ -42,6 +43,7 @@ def register_routes(app):
     app.register_blueprint(ai_result_bp)
     app.register_blueprint(doctor_review_bp)
     app.register_blueprint(medical_report_bp)
+    app.register_blueprint(upload_bp)
     
     # AURA System routes - Communication & Billing
     app.register_blueprint(notification_bp)

@@ -1,6 +1,11 @@
 /**
- * AURA - Doctor Messages
- * List conversations (getConversationsByDoctor), load messages, send message (sender_type: doctor)
+ * AURA - Doctor Messages (FR-20)
+ *
+ * Luồng:
+ * 1. Vào Tin nhắn → loadDoctor() → GET /api/doctors/account/:accountId (lấy doctor_id)
+ * 2. loadConversations() → GET /api/conversations/doctor/:doctorId (danh sách hội thoại + patient_name)
+ * 3. Chọn hội thoại → selectConversation() → GET /api/messages/conversation/:id (tin nhắn)
+ * 4. Gửi tin → POST /api/messages { conversation_id, sender_type: 'doctor', sender_name, content }
  */
 (function () {
   'use strict';
@@ -24,6 +29,7 @@
   var currentConversationId = document.getElementById('currentConversationId');
   var messageContent = document.getElementById('messageContent');
   var btnSend = document.getElementById('btnSend');
+  var btnRefreshConversations = document.getElementById('btnRefreshConversations');
 
   function showError(msg) {
     if (!pageError) return;
@@ -31,11 +37,9 @@
     pageError.classList.toggle('d-none', !msg);
   }
 
-  function loadDoctor(cb) {
-    if (doctorId) {
-      if (cb) cb();
-      return Promise.resolve();
-    }
+  /** Lấy doctor_id từ API, cache vào doctorId/doctorName. Trả về Promise. */
+  function loadDoctor() {
+    if (doctorId) return Promise.resolve();
     if (!accountId) {
       showError('Không tìm thấy tài khoản.');
       return Promise.reject(new Error('No account'));
@@ -48,59 +52,90 @@
         }
         doctorId = doctor.doctor_id;
         doctorName = doctor.doctor_name || 'Bác sĩ';
-        if (cb) cb();
       });
   }
 
+  /** Chuẩn hóa response GET /api/conversations/doctor/:id → { list, count, doctor_id } */
+  function parseConversationsResponse(response) {
+    if (!response) response = {};
+    var payload = response.data != null ? response.data : response;
+    if (!payload) payload = {};
+    var list = payload.conversations || payload.Conversations || [];
+    if (!Array.isArray(list)) list = [];
+    var count = payload.count != null ? payload.count : list.length;
+    var docId = payload.doctor_id != null ? payload.doctor_id : (doctorId || '');
+    return { list: list, count: count, doctor_id: docId };
+  }
+
+  /** Tải danh sách hội thoại của bác sĩ (có patient_name từ backend). */
   function loadConversations() {
-    if (!doctorId) return;
+    if (!doctorId) return Promise.resolve();
     conversationsLoading.classList.remove('d-none');
     conversationsList.classList.add('d-none');
-    conversationsEmpty.classList.add('d-none');
-    window.AuraAPI.getConversationsByDoctor(doctorId, false)
-      .then(function (data) {
+    if (conversationsEmpty) conversationsEmpty.classList.add('d-none');
+
+    return window.AuraAPI.getConversationsByDoctor(doctorId, false)
+      .then(function (response) {
         conversationsLoading.classList.add('d-none');
-        var list = (data && data.conversations) || [];
+        var parsed = parseConversationsResponse(response);
+        var list = parsed.list;
+        var count = parsed.count;
+        var docIdLabel = parsed.doctor_id !== '' ? ' (BS #' + parsed.doctor_id + ')' : '';
+
+        // Luôn hiển thị khu vực danh sách (list / trống / lỗi)
+        conversationsList.classList.remove('d-none');
+
         if (!list.length) {
-          conversationsList.classList.remove('d-none');
-          conversationsList.innerHTML = '<div class="list-group-item text-muted text-center py-4">Chưa có cuộc hội thoại nào.</div>';
-          if (conversationsEmpty) conversationsEmpty.classList.add('d-none');
+          conversationsList.innerHTML =
+            '<div class="list-group-item text-muted text-center py-4">' +
+            'Chưa có cuộc hội thoại nào' + docIdLabel + '.<br>' +
+            '<small class="d-block mt-2">Bệnh nhân cần nhắn tin từ trang Tin nhắn của họ (sau khi bạn đã duyệt kết quả AI).</small>' +
+            '</div>';
           return;
         }
-        if (conversationsEmpty) conversationsEmpty.classList.add('d-none');
+
         var html = '';
         list.forEach(function (c) {
-          var label = 'Hội thoại #' + (c.conversation_id || c.id);
-          if (c.patient_id) label += ' (BN #' + c.patient_id + ')';
-          html += '<a href="#" class="list-group-item list-group-item-action conversation-item" data-id="' + (c.conversation_id || c.id) + '" data-patient-id="' + (c.patient_id || '') + '">' + label + '</a>';
+          var cid = c.conversation_id || c.id;
+          var pid = c.patient_id || '';
+          var pname = (c.patient_name || '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          var label = pname ? ('Bệnh nhân: ' + pname) : ('Hội thoại #' + cid + (pid ? ' (BN #' + pid + ')' : ''));
+          html += '<a href="#" class="list-group-item list-group-item-action conversation-item" data-id="' + cid + '" data-patient-id="' + pid + '" data-patient-name="' + pname + '">' + label + '</a>';
         });
         conversationsList.innerHTML = html;
         conversationsList.querySelectorAll('.conversation-item').forEach(function (el) {
           el.addEventListener('click', function (e) {
             e.preventDefault();
             var id = el.getAttribute('data-id');
-            if (id) selectConversation(parseInt(id, 10));
+            var pname = el.getAttribute('data-patient-name') || '';
+            var displayName = pname ? ('Bệnh nhân: ' + pname) : ('Hội thoại #' + id);
+            if (id) selectConversation(parseInt(id, 10), displayName);
           });
         });
       })
       .catch(function (err) {
         conversationsLoading.classList.add('d-none');
         conversationsList.classList.remove('d-none');
-        conversationsList.innerHTML = '<div class="list-group-item text-danger text-center py-4">' + (err.message || 'Không tải được danh sách.') + '</div>';
+        conversationsList.innerHTML =
+          '<div class="list-group-item text-danger text-center py-4">' +
+          (err.message || 'Không tải được danh sách hội thoại.') +
+          '</div>';
         showError(err.message || 'Tải hội thoại thất bại.');
       });
   }
 
-  function selectConversation(conversationId) {
+  /** Chọn một hội thoại: đặt tiêu đề, tải tin nhắn, bật form gửi. */
+  function selectConversation(conversationId, displayName) {
     currentConversationId.value = conversationId;
-    chatTitle.textContent = 'Hội thoại #' + conversationId;
+    chatTitle.textContent = displayName || ('Hội thoại #' + conversationId);
     messagesPlaceholder.classList.add('d-none');
     messagesList.classList.remove('d-none');
     messageFormWrap.classList.remove('d-none');
     messagesList.innerHTML = '<div class="text-center py-3">Đang tải tin nhắn...</div>';
+
     window.AuraAPI.getMessagesByConversation(conversationId)
       .then(function (data) {
-        var list = (data && data.messages) || [];
+        var list = (data && data.messages) ? data.messages : [];
         if (!list.length) {
           messagesList.innerHTML = '<p class="text-muted text-center mb-0">Chưa có tin nhắn.</p>';
           return;
@@ -121,9 +156,12 @@
       .catch(function (err) {
         messagesList.innerHTML = '<p class="text-danger text-center mb-0">' + (err.message || 'Không tải được tin nhắn.') + '</p>';
       });
-    conversationsList.querySelectorAll('.conversation-item').forEach(function (el) {
-      el.classList.toggle('active', parseInt(el.getAttribute('data-id'), 10) === conversationId);
-    });
+
+    if (conversationsList) {
+      conversationsList.querySelectorAll('.conversation-item').forEach(function (el) {
+        el.classList.toggle('active', parseInt(el.getAttribute('data-id'), 10) === conversationId);
+      });
+    }
   }
 
   function sendMessage(e) {
@@ -140,7 +178,8 @@
     })
       .then(function () {
         messageContent.value = '';
-        selectConversation(cid);
+        var displayName = chatTitle ? chatTitle.textContent : '';
+        selectConversation(cid, displayName);
       })
       .catch(function (err) {
         showError(err.message || 'Gửi tin nhắn thất bại.');
@@ -153,11 +192,29 @@
       });
   }
 
-  if (messageForm) {
-    messageForm.addEventListener('submit', sendMessage);
+  if (messageForm) messageForm.addEventListener('submit', sendMessage);
+
+  function doRefresh() {
+    showError('');
+    doctorId = null;
+    conversationsLoading.classList.remove('d-none');
+    conversationsList.classList.add('d-none');
+    if (conversationsEmpty) conversationsEmpty.classList.add('d-none');
+    loadDoctor()
+      .then(function () { return loadConversations(); })
+      .catch(function () { conversationsLoading.classList.add('d-none'); });
   }
 
-  loadDoctor(function () {
-    loadConversations();
-  });
+  if (btnRefreshConversations) {
+    btnRefreshConversations.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      doRefresh();
+    });
+  }
+
+  // Khởi tạo: load doctor rồi mới load danh sách hội thoại
+  loadDoctor()
+    .then(function () { return loadConversations(); })
+    .catch(function () { if (conversationsLoading) conversationsLoading.classList.add('d-none'); });
 })();

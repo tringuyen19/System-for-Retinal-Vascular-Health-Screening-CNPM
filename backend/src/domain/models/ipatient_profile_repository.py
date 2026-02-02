@@ -47,15 +47,17 @@ class IPatientProfileRepository(ABC):
         pass
     
     @abstractmethod
-    def search_by_name_and_clinic(self, patient_name: str, clinic_id: Optional[int] = None) -> List[PatientProfile]:
-        """Search patients by name, optionally filtered by clinic"""
+    def search_by_name_and_clinic(self, patient_name: str, clinic_id: Optional[int] = None,
+                                  patient_id: Optional[int] = None) -> List[PatientProfile]:
+        """Search patients by name, optionally filtered by clinic and/or patient_id (FR-18)"""
         pass
-    
+
     @abstractmethod
-    def get_by_risk_level(self, risk_level: str, clinic_id: Optional[int] = None, 
-                         patient_name: Optional[str] = None) -> List[PatientProfile]:
+    def get_by_risk_level(self, risk_level: str, clinic_id: Optional[int] = None,
+                         patient_name: Optional[str] = None,
+                         patient_id: Optional[int] = None) -> List[PatientProfile]:
         """
-        Get patients by risk level with optional filters
+        Get patients by risk level with optional filters (FR-18)
         Uses JOIN with retinal_images -> ai_analysis -> ai_results
         """
         pass

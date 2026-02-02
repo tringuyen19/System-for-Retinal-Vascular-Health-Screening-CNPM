@@ -93,18 +93,29 @@ class RetinalImageValidator:
         if eye_side.lower() not in valid_sides:
             raise ValidationException(f"Eye side must be one of: {', '.join(valid_sides)}")
     
+    # Max length for image_url: 500 for external URL, 2MB for data URL (base64)
+    IMAGE_URL_MAX_LENGTH = 2 * 1024 * 1024  # 2MB for data:image/...;base64,...
+
     @staticmethod
     def validate_image_url(image_url: str) -> None:
-        """Validate image URL"""
+        """Validate image URL (http/https URL or data URL base64)."""
         if not image_url:
             raise ValidationException("Image URL is required")
-        
-        if len(image_url) > 500:
-            raise ValidationException("Image URL must be less than 500 characters")
-        
-        # Basic URL format check
-        if not (image_url.startswith('http://') or image_url.startswith('https://')):
-            raise ValidationException("Image URL must start with http:// or https://")
+
+        if len(image_url) > RetinalImageValidator.IMAGE_URL_MAX_LENGTH:
+            raise ValidationException(
+                f"Image URL must be less than {RetinalImageValidator.IMAGE_URL_MAX_LENGTH // 1024}KB"
+            )
+
+        # Allow http/https (external URL) or data: (base64 inline)
+        if not (
+            image_url.startswith("http://")
+            or image_url.startswith("https://")
+            or image_url.startswith("data:")
+        ):
+            raise ValidationException(
+                "Image URL must start with http://, https://, or data: (base64)"
+            )
 
 
 class SubscriptionValidator:
@@ -129,16 +140,20 @@ class SubscriptionValidator:
             raise ValidationException("Start date cannot be in the past")
 
 
+# Giới hạn số tiền thanh toán (VND): cho phép gói cao cấp (vd. Pro 6 Months)
+PAYMENT_AMOUNT_MAX = 500_000_000  # 500 triệu VND
+
+
 class PaymentValidator:
     """Validator for Payment domain entity"""
     
     @staticmethod
     def validate_amount(amount: float) -> None:
-        """Validate payment amount"""
+        """Validate payment amount (VND)"""
         if amount <= 0:
             raise ValidationException("Payment amount must be greater than 0")
         
-        if amount > 1000000:  # Reasonable upper limit
+        if amount > PAYMENT_AMOUNT_MAX:
             raise ValidationException("Payment amount exceeds maximum allowed")
     
     @staticmethod

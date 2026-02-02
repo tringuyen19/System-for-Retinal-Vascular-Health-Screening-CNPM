@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from infrastructure.databases.mssql import session
 from infrastructure.models.ai.ai_analysis_model import AiAnalysisModel
+from infrastructure.models.medical.doctor_review_model import DoctorReviewModel
 from domain.models.ai_analysis import AiAnalysis
 from domain.models.iai_analysis_repository import IAiAnalysisRepository
 
@@ -156,6 +157,26 @@ class AiAnalysisRepository(IAiAnalysisRepository):
             return float(avg_time) if avg_time else 0.0
         except Exception as e:
             raise ValueError(f'Error calculating average processing time: {str(e)}')
+        finally:
+            self.session.close()
+    
+    def get_completed_without_review(self) -> List[AiAnalysis]:
+        """
+        Get completed analyses that do NOT have any doctor review yet.
+        This is used for FR-15 pending review list (bác sĩ cần duyệt kết quả AI).
+        """
+        try:
+            # LEFT JOIN ai_analysis with doctor_reviews and keep rows where there is no review
+            query = (
+                self.session.query(AiAnalysisModel)
+                .outerjoin(DoctorReviewModel, AiAnalysisModel.analysis_id == DoctorReviewModel.analysis_id)
+                .filter(AiAnalysisModel.status == 'completed')
+                .filter(DoctorReviewModel.analysis_id.is_(None))
+            )
+            analysis_models = query.all()
+            return [self._to_domain(model) for model in analysis_models]
+        except Exception as e:
+            raise ValueError(f'Error getting completed analyses without review: {str(e)}')
         finally:
             self.session.close()
     

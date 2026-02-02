@@ -38,8 +38,10 @@
       <nav class="nav flex-column p-3 w-100">
         <span class="text-muted small text-uppercase px-3 mb-2">Bác sĩ</span>
         <a class="nav-link rounded mb-1" href="dashboard.html"><i class="bi bi-house-door me-2"></i>Dashboard</a>
+        <a class="nav-link rounded mb-1" href="performance.html"><i class="bi bi-speedometer2 me-2"></i>Hiệu suất &amp; báo cáo</a>
         <a class="nav-link rounded mb-1" href="patients.html"><i class="bi bi-people me-2"></i>Bệnh nhân</a>
         <a class="nav-link rounded mb-1" href="reviews.html"><i class="bi bi-clipboard-check me-2"></i>Duyệt kết quả AI</a>
+        <a class="nav-link rounded mb-1" href="analysis-results.html"><i class="bi bi-graph-up-arrow me-2"></i>Kết quả & chú thích AI</a>
         <a class="nav-link rounded mb-1" href="create-report.html"><i class="bi bi-file-earmark-plus me-2"></i>Tạo báo cáo</a>
         <a class="nav-link rounded mb-1 active" href="messages.html"><i class="bi bi-chat-dots me-2"></i>Tin nhắn</a>
         <hr class="my-2">
@@ -50,12 +52,16 @@
 
     <main class="flex-grow-1 p-4" style="background-color: #f5f5f5;">
       <div class="container-fluid">
-        <h1 class="h3 mb-4">Tin nhắn với bệnh nhân</h1>
+        <h1 class="h3 mb-4">Tư vấn trực tuyến với bệnh nhân</h1>
+        <p class="text-muted mb-4">Trao đổi với bệnh nhân qua hệ thống nhắn tin (FR-20).</p>
         <div id="pageError" class="alert alert-danger d-none"></div>
         <div class="row">
           <div class="col-md-4 mb-3">
             <div class="card border-0 shadow-sm h-100">
-              <div class="card-header bg-white"><h5 class="mb-0">Cuộc hội thoại</h5></div>
+              <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Bệnh nhân đã nhắn tin</h5>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="btnRefreshConversations" title="Làm mới danh sách"><i class="bi bi-arrow-clockwise"></i></button>
+              </div>
               <div class="card-body p-0">
                 <div id="conversationsLoading" class="text-center py-4">Đang tải...</div>
                 <div id="conversationsList" class="list-group list-group-flush d-none">

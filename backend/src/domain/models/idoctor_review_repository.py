@@ -57,3 +57,8 @@ class IDoctorReviewRepository(ABC):
     def count_by_status(self, validation_status: str) -> int:
         pass
 
+    @abstractmethod
+    def get_patients_by_doctor(self, doctor_id: int) -> List[dict]:
+        """Get distinct patients of this doctor via DoctorReview -> AiAnalysis -> RetinalImage -> patient_id."""
+        pass
+

@@ -585,6 +585,38 @@ def validate_license():
         return error_response(f'Internal server error: {str(e)}', 500)
 
 
+@doctor_bp.route('/<int:doctor_id>/patients', methods=['GET'])
+@require_roles(['Doctor', 'Admin'])
+def get_doctor_patients(doctor_id):
+    """
+    Get patients of this doctor via flow: Patient uploads image -> AI analyzes -> Doctor reviews.
+    ---
+    tags:
+      - Doctor
+    security:
+      - Bearer: []
+    parameters:
+      - name: doctor_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    responses:
+      200:
+        description: List of patients (distinct patient_id from doctor reviews)
+    """
+    try:
+        patients = doctor_service.get_patients_for_doctor(doctor_id)
+        return success_response({
+            'count': len(patients),
+            'patients': patients
+        }, 'Patients retrieved successfully')
+    except NotFoundException:
+        return not_found_response('Doctor not found')
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
 @doctor_bp.route('/<int:doctor_id>/performance', methods=['GET'])
 @require_roles(['Doctor', 'Admin'])
 def get_doctor_performance(doctor_id):
