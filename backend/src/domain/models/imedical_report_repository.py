@@ -5,8 +5,10 @@ from datetime import datetime, date
 
 class IMedicalReportRepository(ABC):
     @abstractmethod
-    def add(self, patient_id: int, analysis_id: int, doctor_id: int, 
-            report_url: str, created_at: datetime) -> MedicalReport:
+    def add(self, patient_id: int, analysis_id: int, doctor_id: int,
+            report_url: str, created_at: datetime,
+            medical_notes: Optional[str] = None, diagnosis: Optional[str] = None,
+            treatment_recommendations: Optional[str] = None) -> MedicalReport:
         pass
 
     @abstractmethod
@@ -39,6 +41,13 @@ class IMedicalReportRepository(ABC):
 
     @abstractmethod
     def update_report_url(self, report_id: int, report_url: str) -> Optional[MedicalReport]:
+        pass
+
+    @abstractmethod
+    def update_report(self, report_id: int, report_url: Optional[str] = None,
+                      medical_notes: Optional[str] = None, diagnosis: Optional[str] = None,
+                      treatment_recommendations: Optional[str] = None) -> Optional[MedicalReport]:
+        """Update report URL and/or FR-16 fields: medical_notes, diagnosis, treatment_recommendations."""
         pass
 
     @abstractmethod

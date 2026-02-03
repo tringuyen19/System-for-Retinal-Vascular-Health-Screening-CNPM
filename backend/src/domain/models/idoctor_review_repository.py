@@ -5,8 +5,9 @@ from datetime import datetime
 
 class IDoctorReviewRepository(ABC):
     @abstractmethod
-    def add(self, analysis_id: int, doctor_id: int, validation_status: str, 
-            comment: Optional[str], reviewed_at: datetime) -> DoctorReview:
+    def add(self, analysis_id: int, doctor_id: int, validation_status: str,
+            comment: Optional[str], reviewed_at: datetime,
+            ai_accuracy_feedback: Optional[str] = None) -> DoctorReview:
         pass
 
     @abstractmethod
@@ -26,6 +27,11 @@ class IDoctorReviewRepository(ABC):
         pass
 
     @abstractmethod
+    def get_where_status_in(self, statuses: List[str]) -> List[DoctorReview]:
+        """Reviews whose validation_status is in the given list (e.g. pending, rejected, needs_revision)."""
+        pass
+
+    @abstractmethod
     def get_pending_reviews(self) -> List[DoctorReview]:
         pass
 
@@ -34,11 +40,11 @@ class IDoctorReviewRepository(ABC):
         pass
 
     @abstractmethod
-    def approve(self, review_id: int, comment: Optional[str]) -> Optional[DoctorReview]:
+    def approve(self, review_id: int, comment: Optional[str], ai_accuracy_feedback: Optional[str] = None) -> Optional[DoctorReview]:
         pass
 
     @abstractmethod
-    def reject(self, review_id: int, comment: str) -> Optional[DoctorReview]:
+    def reject(self, review_id: int, comment: str, ai_accuracy_feedback: Optional[str] = None) -> Optional[DoctorReview]:
         pass
 
     @abstractmethod

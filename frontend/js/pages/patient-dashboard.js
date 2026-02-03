@@ -31,12 +31,12 @@
     var items = [];
     if (images && images.length) {
       images.slice(0, 5).forEach(function (img) {
-        items.push({ text: 'Ảnh #' + (img.image_id || img.id) + ' - ' + (img.image_type || '') + ' (' + (img.upload_time || img.created_at || '') + ')', url: 'my-images.html' });
+        items.push({ text: 'Ảnh ' + (img.image_id || img.id) + ' - ' + (img.image_type || '') + ' (' + (img.upload_time || img.created_at || '') + ')', url: 'my-images.html' });
       });
     }
     if (reports && reports.reports && reports.reports.length) {
       reports.reports.slice(0, 3).forEach(function (r) {
-        items.push({ text: 'Báo cáo #' + (r.report_id || r.id) + ' - ' + (r.created_at || ''), url: 'reports.html' });
+        items.push({ text: 'Báo cáo ' + (r.report_id || r.id) + ' - ' + (r.created_at || ''), url: 'reports.html' });
       });
     }
     if (!items.length) {

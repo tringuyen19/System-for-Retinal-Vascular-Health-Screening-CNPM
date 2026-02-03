@@ -129,12 +129,24 @@ def create_report():
         if not analysis:
             return not_found_response('Analysis not found')
         
-        # STEP 3: Call SERVICE (not Repository directly!) ✅
+        report_url = (data.get('report_url') or '').strip()
+        medical_notes = (data.get('medical_notes') or '').strip()
+        diagnosis = (data.get('diagnosis') or '').strip()
+        treatment_recommendations = (data.get('treatment_recommendations') or '').strip()
+        if not report_url and not medical_notes and not diagnosis and not treatment_recommendations:
+            return validation_error_response({
+                'content': 'Cần nhập ít nhất một trong: đường dẫn báo cáo, ghi chú y khoa, chẩn đoán hoặc khuyến nghị điều trị.'
+            })
+        
+        # STEP 3: Call SERVICE (not Repository directly!) ✅ FR-16: medical_notes, diagnosis, treatment_recommendations
         report = report_service.generate_report(
             patient_id=data['patient_id'],
             analysis_id=data['analysis_id'],
             doctor_id=data['doctor_id'],
-            report_url=data['report_url']
+            report_url=report_url,
+            medical_notes=medical_notes,
+            diagnosis=diagnosis,
+            treatment_recommendations=treatment_recommendations
         )
         
         # STEP 4: Format and return response
@@ -261,7 +273,10 @@ def get_reports_by_patient(patient_id):
                 'report_id': r.report_id,
                 'analysis_id': r.analysis_id,
                 'doctor_id': r.doctor_id,
-                'report_url': r.report_url,
+                'report_url': getattr(r, 'report_url', '') or '',
+                'medical_notes': getattr(r, 'medical_notes', '') or '',
+                'diagnosis': getattr(r, 'diagnosis', '') or '',
+                'treatment_recommendations': getattr(r, 'treatment_recommendations', '') or '',
                 'created_at': r.created_at.isoformat() if r.created_at else None
             } for r in reports]
         })
@@ -301,7 +316,10 @@ def get_reports_by_doctor(doctor_id):
                 'report_id': r.report_id,
                 'patient_id': r.patient_id,
                 'analysis_id': r.analysis_id,
-                'report_url': r.report_url,
+                'report_url': getattr(r, 'report_url', '') or '',
+                'medical_notes': getattr(r, 'medical_notes', '') or '',
+                'diagnosis': getattr(r, 'diagnosis', '') or '',
+                'treatment_recommendations': getattr(r, 'treatment_recommendations', '') or '',
                 'created_at': r.created_at.isoformat() if r.created_at else None
             } for r in reports]
         })
@@ -359,10 +377,76 @@ def get_all_reports():
                 'patient_id': r.patient_id,
                 'analysis_id': r.analysis_id,
                 'doctor_id': r.doctor_id,
+                'report_url': getattr(r, 'report_url', '') or '',
+                'medical_notes': getattr(r, 'medical_notes', '') or '',
+                'diagnosis': getattr(r, 'diagnosis', '') or '',
+                'treatment_recommendations': getattr(r, 'treatment_recommendations', '') or '',
                 'created_at': r.created_at.isoformat() if r.created_at else None
             } for r in reports]
         })
         
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@medical_report_bp.route('/<int:report_id>', methods=['PUT'])
+@require_roles(['Doctor', 'Admin'])
+def update_report(report_id):
+    """
+    Update medical report (FR-16: medical notes, diagnosis, treatment recommendations, report_url)
+    ---
+    tags:
+      - Medical Report
+    security:
+      - Bearer: []
+    parameters:
+      - name: report_id
+        in: path
+        required: true
+        schema:
+          type: integer
+      - in: body
+        name: body
+        schema:
+          type: object
+          properties:
+            report_url:
+              type: string
+            medical_notes:
+              type: string
+            diagnosis:
+              type: string
+            treatment_recommendations:
+              type: string
+    responses:
+      200:
+        description: Report updated successfully
+      404:
+        description: Report not found
+    """
+    try:
+        data = request.get_json() or {}
+        report_url = data.get('report_url')
+        medical_notes = data.get('medical_notes')
+        diagnosis = data.get('diagnosis')
+        treatment_recommendations = data.get('treatment_recommendations')
+        if report_url is None and medical_notes is None and diagnosis is None and treatment_recommendations is None:
+            return validation_error_response({
+                'body': 'Cần gửi ít nhất một trường: report_url, medical_notes, diagnosis, treatment_recommendations.'
+            })
+        report = report_service.update_report(
+            report_id,
+            report_url=report_url,
+            medical_notes=medical_notes,
+            diagnosis=diagnosis,
+            treatment_recommendations=treatment_recommendations
+        )
+        if not report:
+            return not_found_response('Report not found')
+        response_schema = MedicalReportResponseSchema()
+        return success_response(response_schema.dump(report), 'Report updated successfully')
+    except ValueError as e:
+        return error_response(str(e), 400)
     except Exception as e:
         return error_response(f'Internal server error: {str(e)}', 500)
 
@@ -591,7 +675,7 @@ def export_report(report_id):
         # Get image info
         image = image_service.get_image_by_id(analysis.image_id) if hasattr(analysis, 'image_id') and analysis.image_id else None
         
-        # Prepare report data
+        # Prepare report data (FR-16: medical_notes, diagnosis, treatment_recommendations)
         report_data = {
             'report_id': report.report_id,
             'patient_name': patient.patient_name,
@@ -607,7 +691,10 @@ def export_report(report_id):
             'disease_type': ai_result.disease_type if ai_result else 'N/A',
             'risk_level': ai_result.risk_level if ai_result else 'N/A',
             'confidence_score': float(ai_result.confidence_score) if ai_result else 0.0,
-            'created_at': report.created_at
+            'created_at': report.created_at,
+            'medical_notes': getattr(report, 'medical_notes', '') or '',
+            'diagnosis': getattr(report, 'diagnosis', '') or '',
+            'treatment_recommendations': getattr(report, 'treatment_recommendations', '') or '',
         }
         
         # Generate recommendations using RecommendationService (business logic)

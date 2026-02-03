@@ -1,4 +1,4 @@
-from sqlalchemy import Column, BigInteger, String, DateTime, ForeignKey
+from sqlalchemy import Column, BigInteger, String, DateTime, ForeignKey, Text
 from infrastructure.databases.base import Base
 
 class MedicalReportModel(Base):
@@ -9,7 +9,10 @@ class MedicalReportModel(Base):
     patient_id = Column(BigInteger, ForeignKey('patient_profiles.patient_id'), nullable=False)
     analysis_id = Column(BigInteger, ForeignKey('ai_analysis.analysis_id'), nullable=False, unique=True)
     doctor_id = Column(BigInteger, ForeignKey('doctor_profiles.doctor_id'), nullable=False)
-    report_url = Column(String(500), nullable=False)
+    report_url = Column(String(500), nullable=True)  # optional when medical_notes/diagnosis/recommendations provided
+    medical_notes = Column(Text, nullable=True)     # FR-16: ghi chú y khoa
+    diagnosis = Column(Text, nullable=True)         # FR-16: chẩn đoán
+    treatment_recommendations = Column(Text, nullable=True)  # FR-16: khuyến nghị điều trị
     created_at = Column(DateTime, nullable=False)
     
     def __repr__(self):

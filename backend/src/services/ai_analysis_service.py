@@ -183,7 +183,10 @@ class AiAnalysisService:
                 'analysis_dates': [],
                 'risk_levels': [],
                 'confidence_scores': [],
-                'trend': 'no_data'
+                'trend': 'no_data',
+                'trend_dates': [],
+                'trend_risk_levels': [],
+                'trend_risk_numeric': [],
             }
         
         # Get all results for these analyses in one query (optimized)
@@ -196,40 +199,49 @@ class AiAnalysisService:
             results = result_repo.get_by_analysis_id(analysis_id)
             all_results.extend(results)
         
-        # Process results (single pass)
+        # Process results: per-result (for distribution) and per-analysis (for trend by risk level)
         risk_levels = []
         confidence_scores = []
         dates = []
         risk_distribution = {}
-        
+        risk_order = {'low': 1, 'medium': 2, 'high': 3, 'critical': 4}
+
+        # Per-analysis trend: one date and worst risk per analysis (for "Mức rủi ro theo thời gian")
+        trend_dates = []
+        trend_risk_levels = []
+        trend_risk_numeric = []
+
         for analysis in analyses:
-            # Get results for this analysis
             analysis_results = [r for r in all_results if r.analysis_id == analysis.analysis_id]
-            
+            worst_risk_level = None
+            worst_order = 0
             for result in analysis_results:
                 risk_level = result.risk_level
                 risk_levels.append(risk_level)
                 confidence_scores.append(float(result.confidence_score))
                 dates.append(analysis.analysis_time.strftime('%Y-%m-%d'))
-                
-                # Count risk distribution
                 risk_distribution[risk_level] = risk_distribution.get(risk_level, 0) + 1
-        
-        # Calculate average confidence
+                o = risk_order.get((risk_level or '').lower(), 0)
+                if o > worst_order:
+                    worst_order = o
+                    worst_risk_level = risk_level
+            if worst_risk_level is not None:
+                trend_dates.append(analysis.analysis_time.strftime('%Y-%m-%d'))
+                trend_risk_levels.append(worst_risk_level)
+                trend_risk_numeric.append(risk_order.get((worst_risk_level or '').lower(), 0))
+
         avg_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0.0
-        
-        # Determine trend direction
+
+        # Trend direction by risk level (first vs last analysis)
         trend = 'stable'
-        if len(risk_levels) > 1:
-            # Simple trend: compare first and last risk levels
-            first_risk = risk_levels[0]
-            last_risk = risk_levels[-1]
-            risk_order = {'low': 1, 'medium': 2, 'high': 3, 'critical': 4}
-            if risk_order.get(last_risk, 0) < risk_order.get(first_risk, 0):
+        if len(trend_risk_numeric) > 1:
+            first_order = trend_risk_numeric[0]
+            last_order = trend_risk_numeric[-1]
+            if last_order < first_order:
                 trend = 'improving'
-            elif risk_order.get(last_risk, 0) > risk_order.get(first_risk, 0):
+            elif last_order > first_order:
                 trend = 'worsening'
-        
+
         return {
             'patient_id': patient_id,
             'period_days': days,
@@ -239,5 +251,8 @@ class AiAnalysisService:
             'analysis_dates': dates,
             'risk_levels': risk_levels,
             'confidence_scores': confidence_scores,
-            'trend': trend
+            'trend': trend,
+            'trend_dates': trend_dates,
+            'trend_risk_levels': trend_risk_levels,
+            'trend_risk_numeric': trend_risk_numeric,
         }

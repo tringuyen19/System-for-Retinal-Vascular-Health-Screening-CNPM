@@ -3,9 +3,12 @@ from marshmallow import ValidationError
 from api.middleware.auth_middleware import require_roles, require_role
 from infrastructure.repositories.ai_analysis_repository import AiAnalysisRepository
 from infrastructure.repositories.retinal_image_repository import RetinalImageRepository
+from infrastructure.repositories.patient_profile_repository import PatientProfileRepository
+from infrastructure.repositories.notification_repository import NotificationRepository
 from infrastructure.databases.mssql import session
 from services.ai_analysis_service import AiAnalysisService
 from services.retinal_image_service import RetinalImageService
+from services.notification_service import NotificationService
 from api.responses import success_response, error_response, not_found_response, validation_error_response
 from api.schemas import AiAnalysisCreateRequestSchema, AiAnalysisUpdateRequestSchema, AiAnalysisResponseSchema
 from domain.exceptions import NotFoundException, ValidationException
@@ -15,10 +18,13 @@ ai_analysis_bp = Blueprint('ai_analysis', __name__, url_prefix='/api/ai-analysis
 # Initialize repositories (only for service initialization)
 analysis_repo = AiAnalysisRepository(session)
 image_repo = RetinalImageRepository(session)
+patient_repo = PatientProfileRepository(session)
+notification_repo = NotificationRepository(session)
 
 # Initialize SERVICES (Business Logic Layer) ✅
 analysis_service = AiAnalysisService(analysis_repo)
 image_service = RetinalImageService(image_repo)
+notification_service = NotificationService(notification_repo)
 
 
 @ai_analysis_bp.route('/health', methods=['GET'])
@@ -548,6 +554,16 @@ def mark_as_completed(analysis_id):
         analysis = analysis_service.mark_as_completed(analysis_id, processing_time)
         if not analysis:
             return not_found_response('Analysis not found')
+        
+        # FR-9: Gửi thông báo cho patient khi kết quả AI sẵn sàng (analysis -> image -> patient -> account_id)
+        try:
+            image = image_service.get_image_by_id(analysis.image_id)
+            if image:
+                patient = patient_repo.get_by_id(image.patient_id)
+                if patient and patient.account_id:
+                    notification_service.send_ai_result_notification(patient.account_id, analysis_id)
+        except Exception as e:
+            print(f"Warning: FR-9 notification on mark_completed: {str(e)}")
         
         return success_response({
             'analysis_id': analysis.analysis_id,

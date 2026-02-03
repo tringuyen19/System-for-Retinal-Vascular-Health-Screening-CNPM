@@ -14,14 +14,20 @@ class MedicalReportRepository(IMedicalReportRepository):
     def _to_domain(self, model: MedicalReportModel) -> MedicalReport:
         return MedicalReport(
             report_id=model.report_id, patient_id=model.patient_id, analysis_id=model.analysis_id,
-            doctor_id=model.doctor_id, report_url=model.report_url, created_at=model.created_at
+            doctor_id=model.doctor_id, report_url=model.report_url or '', created_at=model.created_at,
+            medical_notes=getattr(model, 'medical_notes', None), diagnosis=getattr(model, 'diagnosis', None),
+            treatment_recommendations=getattr(model, 'treatment_recommendations', None)
         )
     
-    def add(self, patient_id: int, analysis_id: int, doctor_id: int, report_url: str, created_at: datetime) -> MedicalReport:
+    def add(self, patient_id: int, analysis_id: int, doctor_id: int, report_url: str, created_at: datetime,
+            medical_notes: Optional[str] = None, diagnosis: Optional[str] = None,
+            treatment_recommendations: Optional[str] = None) -> MedicalReport:
         try:
             report_model = MedicalReportModel(
                 patient_id=patient_id, analysis_id=analysis_id, doctor_id=doctor_id,
-                report_url=report_url, created_at=created_at
+                report_url=(report_url or '').strip() or '', created_at=created_at,
+                medical_notes=medical_notes or None, diagnosis=diagnosis or None,
+                treatment_recommendations=treatment_recommendations or None
             )
             self.session.add(report_model)
             self.session.commit()
@@ -113,6 +119,30 @@ class MedicalReportRepository(IMedicalReportRepository):
         except Exception as e:
             self.session.rollback()
             raise ValueError(f'Error updating report URL: {str(e)}')
+        finally:
+            self.session.close()
+
+    def update_report(self, report_id: int, report_url: Optional[str] = None,
+                      medical_notes: Optional[str] = None, diagnosis: Optional[str] = None,
+                      treatment_recommendations: Optional[str] = None) -> Optional[MedicalReport]:
+        try:
+            report_model = self.session.query(MedicalReportModel).filter_by(report_id=report_id).first()
+            if not report_model:
+                return None
+            if report_url is not None:
+                report_model.report_url = report_url
+            if medical_notes is not None:
+                report_model.medical_notes = medical_notes
+            if diagnosis is not None:
+                report_model.diagnosis = diagnosis
+            if treatment_recommendations is not None:
+                report_model.treatment_recommendations = treatment_recommendations
+            self.session.commit()
+            self.session.refresh(report_model)
+            return self._to_domain(report_model)
+        except Exception as e:
+            self.session.rollback()
+            raise ValueError(f'Error updating report: {str(e)}')
         finally:
             self.session.close()
     

@@ -10,6 +10,7 @@ class DoctorReviewModel(Base):
     doctor_id = Column(BigInteger, ForeignKey('doctor_profiles.doctor_id'), nullable=False)
     validation_status = Column(String(20), nullable=False)
     comment = Column(String(1000), nullable=True)
+    ai_accuracy_feedback = Column(String(30), nullable=True)  # FR-19: correct / incorrect / partially_correct
     reviewed_at = Column(DateTime, nullable=False)
     
     def __repr__(self):

@@ -14,6 +14,8 @@
   var statPatients = document.getElementById('statPatients');
   var statReviews = document.getElementById('statReviews');
   var statReports = document.getElementById('statReports');
+  var statPending = document.getElementById('statPending');
+  var pendingBadge = document.getElementById('pendingBadge');
   var pendingList = document.getElementById('pendingList');
   var analysisResultsList = document.getElementById('analysisResultsList');
   var dashboardError = document.getElementById('dashboardError');
@@ -28,19 +30,43 @@
     if (el) el.textContent = value != null ? value : '-';
   }
 
+  function setPendingCount(count) {
+    var n = (count != null && count !== '-') ? (typeof count === 'number' ? count : parseInt(count, 10)) : null;
+    var num = (n !== null && !isNaN(n)) ? n : 0;
+    if (statPending) statPending.textContent = (count === '-' || count == null) ? '-' : num;
+    if (pendingBadge) pendingBadge.textContent = num;
+  }
+
   function renderPending(pendingData) {
-    var list = (pendingData && pendingData.pending_analyses) || [];
+    // Giống trang reviews: hỗ trợ response bọc trong data (data.data) và luôn đếm từ mảng
+    var payload = (pendingData && pendingData.data !== undefined) ? pendingData.data : (pendingData || {});
+    var pendingListItems = (payload.pending_analyses && Array.isArray(payload.pending_analyses)) ? payload.pending_analyses : [];
+    var needRevListRaw = (payload.need_revision_reviews && Array.isArray(payload.need_revision_reviews)) ? payload.need_revision_reviews : [];
+    // Chỉ "Cần duyệt": chưa approved (pending, rejected, needs_revision). Loại bỏ approved.
+    var needRevList = needRevListRaw.filter(function (r) {
+      return (r.validation_status || '').toLowerCase() !== 'approved';
+    });
+    var totalItems = pendingListItems.length + needRevList.length;
+    setPendingCount(totalItems);
+
     if (!pendingList) return;
-    if (!list.length) {
+    if (totalItems === 0) {
       pendingList.innerHTML = '<p class="text-muted mb-0">Không có kết quả AI nào chờ duyệt.</p>';
       return;
     }
     var html = '<ul class="list-group list-group-flush">';
-    list.slice(0, 5).forEach(function (a) {
-      var completed = a.completed_at ? new Date(a.completed_at).toLocaleDateString('vi-VN') : '-';
+    var combined = [];
+    pendingListItems.forEach(function (a) {
+      combined.push({ analysis_id: a.analysis_id || a.id, image_id: a.image_id, dateStr: a.completed_at ? new Date(a.completed_at).toLocaleDateString('vi-VN') : '-', label: 'Chưa duyệt' });
+    });
+    needRevList.forEach(function (r) {
+      var d = (r.reviewed_at || r.completed_at) ? new Date(r.reviewed_at || r.completed_at).toLocaleDateString('vi-VN') : '-';
+      combined.push({ analysis_id: r.analysis_id || r.id, image_id: r.image_id, dateStr: d, label: r.validation_status === 'rejected' ? 'Từ chối' : r.validation_status === 'needs_revision' ? 'Cần chỉnh sửa' : 'Chờ duyệt' });
+    });
+    combined.slice(0, 5).forEach(function (item) {
       html += '<li class="list-group-item d-flex justify-content-between align-items-center">' +
-        '<span>Phân tích' + (a.analysis_id || a.id) + ' (Ảnh' + (a.image_id || '-') + ') - ' + completed + '</span>' +
-        '<a href="reviews.html?analysis_id=' + (a.analysis_id || a.id) + '" class="btn btn-sm btn-outline-primary">Duyệt</a></li>';
+        '<span>Phân tích ' + item.analysis_id + ' (Ảnh ' + (item.image_id || '-') + ') - ' + item.dateStr + ' <span class="badge bg-secondary ms-1">' + item.label + '</span></span>' +
+        '<a href="reviews.html?analysis_id=' + item.analysis_id + '" class="btn btn-sm btn-outline-primary">Duyệt</a></li>';
     });
     html += '</ul>';
     pendingList.innerHTML = html;
@@ -65,6 +91,19 @@
     analysisResultsList.innerHTML = html;
   }
 
+  /** Luôn gọi GET /api/doctor-reviews/pending và cập nhật thẻ "Cần duyệt" + danh sách (độc lập với các API khác). */
+  function loadPendingFromApi() {
+    window.AuraAPI.getPendingReviews()
+      .then(function (data) {
+        var payload = (data && data.data !== undefined) ? data.data : (data || {});
+        renderPending(payload);
+      })
+      .catch(function () {
+        setPendingCount(0);
+        if (pendingList) pendingList.innerHTML = '<p class="text-muted mb-0">Không tải được danh sách cần duyệt.</p>';
+      });
+  }
+
   function load() {
     if (!accountId) {
       showError('Không tìm thấy thông tin tài khoản.');
@@ -74,6 +113,9 @@
     if (pendingList) pendingList.innerHTML = 'Đang tải...';
     if (analysisResultsList) analysisResultsList.innerHTML = 'Đang tải...';
 
+    // Luôn gọi GET /api/doctor-reviews/pending ngay để hiển thị số "Cần duyệt" (không phụ thuộc Promise.all)
+    loadPendingFromApi();
+
     window.AuraAPI.getDoctorByAccount(accountId)
       .then(function (doctor) {
         if (!doctor || !doctor.doctor_id) {
@@ -81,14 +123,12 @@
           setStat(statPatients, 0);
           setStat(statReviews, 0);
           setStat(statReports, 0);
-          renderPending({ pending_analyses: [] });
           renderAnalysisResults([]);
           return null;
         }
         doctorId = doctor.doctor_id;
         return Promise.all([
           window.AuraAPI.getDoctorPerformance(doctorId),
-          window.AuraAPI.getPendingReviews(),
           window.AuraAPI.getReportsByDoctor(doctorId),
           window.AuraAPI.getCompletedAnalyses()
         ]);
@@ -96,15 +136,14 @@
       .then(function (results) {
         if (!results) return;
         var perf = results[0];
-        var pendingData = results[1];
-        var reportsData = results[2];
-        var completedData = results[3];
+        var reportsData = results[1];
+        var completedData = results[2];
 
         setStat(statPatients, (perf && perf.unique_patients != null) ? perf.unique_patients : '-');
-        setStat(statReviews, (perf && perf.total_reviews != null) ? perf.total_reviews : '-');
+        // Chỉ tính "Đã duyệt" khi validation_status = approved
+        setStat(statReviews, (perf && perf.approved_reviews != null) ? perf.approved_reviews : '-');
         var reports = (reportsData && reportsData.reports) || [];
         setStat(statReports, (reportsData && reportsData.count != null) ? reportsData.count : reports.length);
-        renderPending(pendingData);
         renderAnalysisResults(completedData);
       })
       .catch(function (err) {

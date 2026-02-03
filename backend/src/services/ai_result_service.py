@@ -59,6 +59,9 @@ class AiResultService:
         if not result:
             raise ValueError("Failed to create AI result")
         
+        # FR-9: Gửi thông báo khi kết quả AI sẵn sàng cho patient
+        if self.notification_repository:
+            self._send_ai_result_ready_notification(result)
         # FR-5: Gửi khuyến nghị/cảnh báo sức khỏe tự động cho patient
         if self.notification_repository:
             self._send_patient_recommendation(result)
@@ -67,6 +70,30 @@ class AiResultService:
             self._send_high_risk_alert(result)
         
         return result
+    
+    def _send_ai_result_ready_notification(self, result: AiResult):
+        """
+        FR-9: Gửi thông báo "Kết quả phân tích AI đã sẵn sàng" cho patient.
+        """
+        try:
+            from services.notification_service import NotificationService
+            from infrastructure.repositories.patient_profile_repository import PatientProfileRepository
+            from infrastructure.databases.mssql import session
+            if not self.analysis_repository or not self.image_repository:
+                return
+            analysis = self.analysis_repository.get_by_id(result.analysis_id)
+            if not analysis:
+                return
+            image = self.image_repository.get_by_id(analysis.image_id)
+            if not image:
+                return
+            patient = PatientProfileRepository(session).get_by_id(image.patient_id)
+            if not patient or not patient.account_id:
+                return
+            notification_service = NotificationService(self.notification_repository)
+            notification_service.send_ai_result_notification(patient.account_id, result.analysis_id)
+        except Exception as e:
+            print(f"Warning: FR-9 failed to send ai_result_ready notification: {str(e)}")
     
     def _send_patient_recommendation(self, result: AiResult):
         """

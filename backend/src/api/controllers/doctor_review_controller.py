@@ -109,7 +109,8 @@ def create_review():
             analysis_id=data['analysis_id'],
             doctor_id=data['doctor_id'],
             validation_status=data['validation_status'],
-            comment=data.get('comment')
+            comment=data.get('comment'),
+            ai_accuracy_feedback=data.get('ai_accuracy_feedback')
         )
         
         response_schema = DoctorReviewResponseSchema()
@@ -225,7 +226,8 @@ def get_reviews_by_doctor(doctor_id):
                 'review_id': r.review_id,
                 'analysis_id': r.analysis_id,
                 'validation_status': r.validation_status,
-                'reviewed_at': r.reviewed_at.isoformat() if r.reviewed_at else None
+                'reviewed_at': r.reviewed_at.isoformat() if r.reviewed_at else None,
+                'ai_accuracy_feedback': getattr(r, 'ai_accuracy_feedback', None)
             } for r in reviews]
         })
         
@@ -306,29 +308,45 @@ def get_reviews_by_status(status):
 @doctor_review_bp.route('/pending', methods=['GET'])
 def get_pending_reviews():
     """
-    Get pending reviews (analyses without review)
+    Get items needing doctor review: (1) analyses with no review yet,
+    (2) reviews with validation_status != 'approved' (pending, rejected, needs_revision).
     ---
     tags:
       - Doctor Review
     responses:
       200:
-        description: List of analyses pending review
+        description: pending_analyses + need_revision_reviews (all to show in "Cần duyệt")
     """
     try:
-        # Returns analyses that are completed but have no doctor review yet
         pending_analyses = review_service.get_pending_reviews()
-        
+        need_revision = review_service.get_reviews_needing_approval()
+
+        need_revision_list = []
+        for r in need_revision:
+            a = analysis_service.get_analysis_by_id(r.analysis_id)
+            need_revision_list.append({
+                'analysis_id': r.analysis_id,
+                'review_id': r.review_id,
+                'image_id': a.image_id if a else None,
+                'status': a.status if a else None,
+                'validation_status': r.validation_status,
+                'completed_at': a.analysis_time.isoformat() if a and getattr(a, 'analysis_time', None) else None,
+                'reviewed_at': r.reviewed_at.isoformat() if r.reviewed_at else None,
+            })
+
+        pending_list = [{
+            'analysis_id': a.analysis_id,
+            'image_id': a.image_id,
+            'status': a.status,
+            'completed_at': a.analysis_time.isoformat() if getattr(a, 'analysis_time', None) else None,
+        } for a in pending_analyses]
+
+        total = len(pending_list) + len(need_revision_list)
         return success_response({
-            'count': len(pending_analyses),
-            'pending_analyses': [{
-                'analysis_id': a.analysis_id,
-                'image_id': a.image_id,
-                'status': a.status,
-                # Use analysis_time as completion time; ai_analysis table does not have a separate completed_at column
-                'completed_at': a.analysis_time.isoformat() if getattr(a, 'analysis_time', None) else None
-            } for a in pending_analyses]
+            'count': total,
+            'pending_analyses': pending_list,
+            'need_revision_reviews': need_revision_list,
         })
-        
     except Exception as e:
         return error_response(f'Internal server error: {str(e)}', 500)
 
@@ -417,18 +435,18 @@ def reject_review(review_id):
         description: Review not found
     """
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         if not data.get('comment'):
             return validation_error_response({'comment': 'Comment is required for rejection'})
-        
-        review = review_service.reject_review(review_id, data['comment'])
+        ai_accuracy_feedback = data.get('ai_accuracy_feedback')
+        review = review_service.reject_review(review_id, data['comment'], ai_accuracy_feedback=ai_accuracy_feedback)
         if not review:
             return not_found_response('Review not found')
-        
         return success_response({
             'review_id': review.review_id,
             'validation_status': review.validation_status,
-            'comment': review.comment
+            'comment': review.comment,
+            'ai_accuracy_feedback': getattr(review, 'ai_accuracy_feedback', None)
         }, 'Review rejected')
         
     except ValueError as e:

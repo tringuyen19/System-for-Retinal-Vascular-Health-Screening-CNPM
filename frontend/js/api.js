@@ -216,15 +216,24 @@
     return res.data;
   }
 
-  /** Doctor: duyệt review (PUT /api/doctor-reviews/:id/approve) */
-  async function approveReview(reviewId) {
-    const res = await request('PUT', '/api/doctor-reviews/' + reviewId + '/approve', null);
+  /** Doctor: duyệt review (PUT /api/doctor-reviews/:id/approve). Body (optional): { comment, ai_accuracy_feedback } - FR-19 */
+  async function approveReview(reviewId, body) {
+    const res = await request('PUT', '/api/doctor-reviews/' + reviewId + '/approve', body || null);
     return res.data;
   }
 
-  /** Doctor: từ chối review (PUT /api/doctor-reviews/:id/reject) body: { comment } */
-  async function rejectReview(reviewId, comment) {
-    const res = await request('PUT', '/api/doctor-reviews/' + reviewId + '/reject', { comment: comment || '' });
+  /** Doctor: từ chối review (PUT /api/doctor-reviews/:id/reject). comment required; ai_accuracy_feedback optional (FR-19) */
+  async function rejectReview(reviewId, comment, aiAccuracyFeedback) {
+    const payload = { comment: comment || '' };
+    if (aiAccuracyFeedback) payload.ai_accuracy_feedback = aiAccuracyFeedback;
+    const res = await request('PUT', '/api/doctor-reviews/' + reviewId + '/reject', payload);
+    return res.data;
+  }
+
+  /** Doctor/Admin: tổng hợp phản hồi AI (FR-19) - GET /api/doctor-reviews/feedback/aggregation?doctor_id= */
+  async function getFeedbackAggregation(doctorId) {
+    const q = doctorId != null ? '?doctor_id=' + encodeURIComponent(doctorId) : '';
+    const res = await request('GET', '/api/doctor-reviews/feedback/aggregation' + q);
     return res.data;
   }
 
@@ -234,10 +243,47 @@
     return res.data;
   }
 
-  /** Doctor: tạo báo cáo y tế (POST /api/medical-reports) */
+  /** Doctor: tạo báo cáo y tế (POST /api/medical-reports) - FR-16: medical_notes, diagnosis, treatment_recommendations */
   async function createMedicalReport(payload) {
     const res = await request('POST', '/api/medical-reports', payload);
     return res.data;
+  }
+
+  /** Doctor: lấy báo cáo theo ID (GET /api/medical-reports/:id) */
+  async function getMedicalReport(reportId) {
+    const res = await request('GET', '/api/medical-reports/' + reportId);
+    return res.data;
+  }
+
+  /** Doctor: cập nhật báo cáo (PUT /api/medical-reports/:id) - FR-16: medical_notes, diagnosis, treatment_recommendations */
+  async function updateMedicalReport(reportId, payload) {
+    const res = await request('PUT', '/api/medical-reports/' + reportId, payload);
+    return res.data;
+  }
+
+  /** Patient/Doctor: tải PDF báo cáo từ API (GET /api/medical-reports/:id/export?format=pdf). Gửi kèm token, trả blob và trigger download. */
+  async function exportMedicalReportPdf(reportId) {
+    const API_BASE = window.AURA_CONFIG ? window.AURA_CONFIG.API_BASE_URL : 'http://localhost:9999';
+    const path = '/api/medical-reports/' + reportId + '/export?format=pdf';
+    const headers = getHeaders(true);
+    delete headers['Content-Type']; // binary response
+    let res;
+    try {
+      res = await fetch(API_BASE + path, { method: 'GET', headers });
+    } catch (e) {
+      throw new Error('Không thể kết nối máy chủ. Kiểm tra backend đã chạy chưa.');
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(parseErrorMessage(res, data));
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'medical_report_' + reportId + '.pdf';
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   /** Doctor: danh sách hội thoại (GET /api/conversations/doctor/:id). Trả full response { message, data: { doctor_id, count, conversations } } */
@@ -777,8 +823,12 @@
     getReviewsByDoctor,
     approveReview,
     rejectReview,
+    getFeedbackAggregation,
     getReportsByDoctor,
     createMedicalReport,
+    getMedicalReport,
+    updateMedicalReport,
+    exportMedicalReportPdf,
     getConversationsByDoctor,
     getConversationsByPatient,
     getDoctorsWhoReviewedPatient,

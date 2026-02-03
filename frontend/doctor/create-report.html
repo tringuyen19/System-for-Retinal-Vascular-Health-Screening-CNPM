@@ -61,9 +61,9 @@
               <div class="mb-3">
                 <label class="form-label">Bệnh nhân <span class="text-danger">*</span></label>
                 <select class="form-select" id="patientId" name="patient_id" required>
-                  <option value="">-- Chọn bệnh nhân --</option>
+                  <option value="">-- Chọn bệnh nhân (đã được bác sĩ duyệt) --</option>
                 </select>
-                <small class="form-text text-muted">Chọn bệnh nhân để tải danh sách phân tích.</small>
+                <small class="form-text text-muted">Chỉ hiển thị bệnh nhân mà bác sĩ đã duyệt kết quả AI. Chọn bệnh nhân để tải danh sách phân tích.</small>
               </div>
               <div class="mb-3">
                 <label class="form-label">Phân tích (AI) <span class="text-danger">*</span></label>
@@ -72,13 +72,23 @@
                 </select>
                 <small class="form-text text-muted">Chọn kết quả phân tích AI liên quan đến báo cáo.</small>
               </div>
+              <div class="alert alert-info py-2 small mb-3" role="alert">
+                <i class="bi bi-info-circle me-1"></i> PDF báo cáo do <strong>hệ thống tự tạo</strong> khi bệnh nhân nhấn "Xem / Tải PDF" tại trang Báo cáo. Bác sĩ chỉ cần nhập nội dung bên dưới.
+              </div>
               <div class="mb-3">
-                <label class="form-label">Đường dẫn báo cáo (URL) <span class="text-danger">*</span></label>
-                <input type="url" class="form-control" id="reportUrl" name="report_url" placeholder="https://..." required>
-                <small class="form-text text-muted">URL tới file báo cáo (PDF hoặc tài liệu) đã lưu trên hệ thống hoặc bên ngoài.</small>
+                <label class="form-label">Ghi chú y khoa</label>
+                <textarea class="form-control" id="medicalNotes" name="medical_notes" rows="3" placeholder="Ghi chú quan sát, tiền sử liên quan..."></textarea>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Chẩn đoán</label>
+                <textarea class="form-control" id="diagnosis" name="diagnosis" rows="3" placeholder="Chẩn đoán dựa trên kết quả phân tích..."></textarea>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Khuyến nghị điều trị</label>
+                <textarea class="form-control" id="treatmentRecommendations" name="treatment_recommendations" rows="3" placeholder="Khuyến nghị theo dõi, điều trị hoặc tái khám..."></textarea>
               </div>
               <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary" id="btnSubmit">Tạo báo cáo</button>
+                <button type="button" class="btn btn-primary" id="btnSubmit">Tạo báo cáo</button>
                 <a href="dashboard.html" class="btn btn-outline-secondary">Hủy</a>
               </div>
             </form>
@@ -100,6 +110,6 @@
   <script src="../js/components/header.js"></script>
   <script src="../js/components/sidebar.js"></script>
   <script src="../js/components/alert.js"></script>
-  <script src="../js/pages/doctor-create-report.js"></script>
+  <script src="../js/pages/doctor-create-report.js?v=3"></script>
 </body>
 </html>

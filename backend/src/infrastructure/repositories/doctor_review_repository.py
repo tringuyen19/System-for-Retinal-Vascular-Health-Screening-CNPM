@@ -18,15 +18,18 @@ class DoctorReviewRepository(IDoctorReviewRepository):
     def _to_domain(self, model: DoctorReviewModel) -> DoctorReview:
         return DoctorReview(
             review_id=model.review_id, analysis_id=model.analysis_id, doctor_id=model.doctor_id,
-            validation_status=model.validation_status, comment=model.comment, reviewed_at=model.reviewed_at
+            validation_status=model.validation_status, comment=model.comment, reviewed_at=model.reviewed_at,
+            ai_accuracy_feedback=getattr(model, 'ai_accuracy_feedback', None)
         )
     
     def add(self, analysis_id: int, doctor_id: int, validation_status: str,
-            comment: Optional[str], reviewed_at: datetime) -> DoctorReview:
+            comment: Optional[str], reviewed_at: datetime,
+            ai_accuracy_feedback: Optional[str] = None) -> DoctorReview:
         try:
             review_model = DoctorReviewModel(
                 analysis_id=analysis_id, doctor_id=doctor_id, validation_status=validation_status,
-                comment=comment, reviewed_at=reviewed_at
+                comment=comment, reviewed_at=reviewed_at,
+                ai_accuracy_feedback=ai_accuracy_feedback or None
             )
             self.session.add(review_model)
             self.session.commit()
@@ -73,7 +76,20 @@ class DoctorReviewRepository(IDoctorReviewRepository):
             raise ValueError(f'Error getting reviews by status: {str(e)}')
         finally:
             self.session.close()
-    
+
+    def get_where_status_in(self, statuses: List[str]) -> List[DoctorReview]:
+        try:
+            if not statuses:
+                return []
+            review_models = self.session.query(DoctorReviewModel).filter(
+                DoctorReviewModel.validation_status.in_(statuses)
+            ).all()
+            return [self._to_domain(model) for model in review_models]
+        except Exception as e:
+            raise ValueError(f'Error getting reviews by statuses: {str(e)}')
+        finally:
+            self.session.close()
+
     def get_pending_reviews(self) -> List[DoctorReview]:
         return self.get_by_status('pending')
     
@@ -86,14 +102,16 @@ class DoctorReviewRepository(IDoctorReviewRepository):
         finally:
             self.session.close()
     
-    def approve(self, review_id: int, comment: Optional[str]) -> Optional[DoctorReview]:
+    def approve(self, review_id: int, comment: Optional[str], ai_accuracy_feedback: Optional[str] = None) -> Optional[DoctorReview]:
         try:
             review_model = self.session.query(DoctorReviewModel).filter_by(review_id=review_id).first()
             if not review_model:
                 return None
             review_model.validation_status = 'approved'
-            if comment:
+            if comment is not None:
                 review_model.comment = comment
+            if ai_accuracy_feedback is not None and hasattr(review_model, 'ai_accuracy_feedback'):
+                review_model.ai_accuracy_feedback = ai_accuracy_feedback
             self.session.commit()
             self.session.refresh(review_model)
             return self._to_domain(review_model)
@@ -103,13 +121,15 @@ class DoctorReviewRepository(IDoctorReviewRepository):
         finally:
             self.session.close()
     
-    def reject(self, review_id: int, comment: str) -> Optional[DoctorReview]:
+    def reject(self, review_id: int, comment: str, ai_accuracy_feedback: Optional[str] = None) -> Optional[DoctorReview]:
         try:
             review_model = self.session.query(DoctorReviewModel).filter_by(review_id=review_id).first()
             if not review_model:
                 return None
             review_model.validation_status = 'rejected'
             review_model.comment = comment
+            if ai_accuracy_feedback is not None and hasattr(review_model, 'ai_accuracy_feedback'):
+                review_model.ai_accuracy_feedback = ai_accuracy_feedback
             self.session.commit()
             self.session.refresh(review_model)
             return self._to_domain(review_model)
@@ -125,7 +145,7 @@ class DoctorReviewRepository(IDoctorReviewRepository):
             if not review_model:
                 return None
             for key, value in kwargs.items():
-                if hasattr(review_model, key) and key not in ['review_id', 'reviewed_at']:
+                if hasattr(review_model, key) and key != 'review_id':
                     setattr(review_model, key, value)
             self.session.commit()
             self.session.refresh(review_model)

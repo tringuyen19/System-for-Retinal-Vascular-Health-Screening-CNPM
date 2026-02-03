@@ -111,10 +111,10 @@
             '<div class="card aura-analysis-card border-0 shadow-sm h-100">' +
             '<div class="card-body">' +
             '<div class="d-flex justify-content-between align-items-start mb-2">' +
-            '<h6 class="card-title mb-0"><i class="bi bi-graph-up-arrow text-primary me-1"></i>Phân tích #' + (a.analysis_id || '-') + '</h6>' +
+            '<h6 class="card-title mb-0"><i class="bi bi-graph-up-arrow text-primary me-1"></i>Phân tích ' + (a.analysis_id || '-') + '</h6>' +
             '<span class="badge bg-' + statusClass + ' rounded-pill">' + status + '</span>' +
             '</div>' +
-            '<p class="card-text small text-muted mb-0"><i class="bi bi-image me-1"></i>Ảnh #' + (a.image_id || '-') + '</p>' +
+            '<p class="card-text small text-muted mb-0"><i class="bi bi-image me-1"></i>Ảnh ' + (a.image_id || '-') + '</p>' +
             '<p class="card-text small text-muted mb-0"><i class="bi bi-clock me-1"></i>' + dateStr + '</p>' +
             resultsHtml +
             '<a href="reports.html" class="btn btn-outline-primary btn-sm mt-3 w-100"><i class="bi bi-file-earmark-text me-1"></i>Xem báo cáo</a>' +

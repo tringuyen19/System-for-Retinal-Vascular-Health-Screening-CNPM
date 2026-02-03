@@ -143,6 +143,22 @@ class ExportService:
         story.append(analysis_table)
         story.append(Spacer(1, 0.3*inch))
         
+        # FR-16: Medical notes, diagnosis, treatment recommendations
+        medical_notes = report_data.get('medical_notes', '').strip()
+        diagnosis = report_data.get('diagnosis', '').strip()
+        treatment_recommendations = report_data.get('treatment_recommendations', '').strip()
+        if medical_notes or diagnosis or treatment_recommendations:
+            story.append(Paragraph("Doctor Notes", heading_style))
+            if medical_notes:
+                story.append(Paragraph("<b>Medical Notes:</b> " + medical_notes.replace('\n', '<br/>'), styles['Normal']))
+                story.append(Spacer(1, 0.15*inch))
+            if diagnosis:
+                story.append(Paragraph("<b>Diagnosis:</b> " + diagnosis.replace('\n', '<br/>'), styles['Normal']))
+                story.append(Spacer(1, 0.15*inch))
+            if treatment_recommendations:
+                story.append(Paragraph("<b>Treatment Recommendations:</b> " + treatment_recommendations.replace('\n', '<br/>'), styles['Normal']))
+            story.append(Spacer(1, 0.3*inch))
+        
         # Recommendations
         recommendations = report_data.get('recommendations')
         if recommendations:
@@ -199,6 +215,9 @@ class ExportService:
         writer.writerow(['Disease Type', report_data.get('disease_type', 'N/A')])
         writer.writerow(['Risk Level', report_data.get('risk_level', 'N/A')])
         writer.writerow(['Confidence Score', f"{report_data.get('confidence_score', 0):.2f}%"])
+        writer.writerow(['Medical Notes', report_data.get('medical_notes', '') or ''])
+        writer.writerow(['Diagnosis', report_data.get('diagnosis', '') or ''])
+        writer.writerow(['Treatment Recommendations', report_data.get('treatment_recommendations', '') or ''])
         
         recommendations = report_data.get('recommendations')
         if recommendations:
