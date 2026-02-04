@@ -24,6 +24,12 @@
   var accountStatus = document.getElementById('accountStatus');
   var wrapStatus = document.getElementById('wrapStatus');
   var btnSaveAccount = document.getElementById('btnSaveAccount');
+  var modalPermissions = document.getElementById('modalPermissions');
+  var permAccountId = document.getElementById('permAccountId');
+  var permAccountEmail = document.getElementById('permAccountEmail');
+  var permRoleId = document.getElementById('permRoleId');
+  var btnSavePermissions = document.getElementById('btnSavePermissions');
+  var permissionsContainer = document.getElementById('permissionsContainer');
 
   var roles = [];
   var accounts = [];
@@ -113,7 +119,9 @@
       html += '<button type="button" class="btn btn-sm btn-outline-primary me-1 btn-edit" data-id="' + id + '">Sửa</button>';
       html += '<button type="button" class="btn btn-sm btn-outline-warning me-1 btn-status" data-id="' + id + '" data-status="' + status + '">Trạng thái</button>';
       html += '<button type="button" class="btn btn-sm btn-outline-danger btn-delete" data-id="' + id + '">Xóa</button>';
-      html += '</td></tr>';
+      html += '</td>';
+      html += '<td><button type="button" class="btn btn-sm btn-outline-info btn-permissions" data-id="' + id + '" data-role="' + (a.role_id || '') + '" data-email="' + (a.email || '') + '"><i class="bi bi-shield-lock"></i>Quyền</button></td>';
+      html += '</tr>';
     });
     accountsTableBody.innerHTML = html;
 
@@ -155,6 +163,61 @@
         }
       });
     });
+    accountsTableBody.querySelectorAll('.btn-permissions').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var id = this.getAttribute('data-id');
+        var roleId = this.getAttribute('data-role');
+        var email = this.getAttribute('data-email');
+        openModalPermissions(id, roleId, email);
+      });
+    });
+  }
+
+  function openModalPermissions(accountId, roleId, email) {
+    if (permAccountId) permAccountId.value = accountId;
+    if (permRoleId) permRoleId.value = roleId;
+    if (permAccountEmail) permAccountEmail.textContent = email;
+    
+    // Load permissions for this role
+    window.AuraAPI.getPermissionsByRole(roleId)
+      .then(function (res) {
+        var perms = (res && res.permissions) ? res.permissions : [];
+        renderPermissions(perms);
+        var modal = bootstrap.Modal.getOrCreateInstance(modalPermissions);
+        if (modal) modal.show();
+      })
+      .catch(function (e) {
+        if (window.AuraAlert && window.AuraAlert.toast) window.AuraAlert.toast(e.message || 'Không tải được quyền', 'danger');
+      });
+  }
+
+  function renderPermissions(permissions) {
+    if (!permissionsContainer) return;
+    var html = '';
+    var grouped = {};
+    
+    permissions.forEach(function (p) {
+      var resource = p.resource || p.action_resource || 'Other';
+      if (!grouped[resource]) grouped[resource] = [];
+      grouped[resource].push(p);
+    });
+    
+    Object.keys(grouped).forEach(function (resource) {
+      html += '<div class="col-md-6">';
+      html += '<div class="card border-0 bg-light p-3">';
+      html += '<h6 class="mb-2">' + resource + '</h6>';
+      grouped[resource].forEach(function (p) {
+        var permId = p.permission_id || p.id;
+        var action = p.action || '';
+        html += '<div class="form-check mb-2">';
+        html += '<input class="form-check-input permission-check" type="checkbox" value="' + permId + '" id="perm' + permId + '" data-action="' + action + '">';
+        html += '<label class="form-check-label" for="perm' + permId + '">' + action + '</label>';
+        html += '</div>';
+      });
+      html += '</div></div>';
+    });
+    
+    if (permissionsContainer) permissionsContainer.innerHTML = html || '<p class="text-muted">Không có quyền</p>';
   }
 
   function openModalCreate() {

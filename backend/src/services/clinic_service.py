@@ -212,6 +212,34 @@ class ClinicService:
             'pending': self.repository.count_clinics('pending'),
             'rejected': self.repository.count_clinics('rejected')
         }
+    
+    def list_clinics_paginated(self, status: Optional[str] = None,
+                               limit: int = 20, offset: int = 0) -> tuple:
+        """
+        List clinics with pagination and filtering (FR-31)
+        
+        Args:
+            status: Filter by status (pending, verified, rejected)
+            limit: Number of results per page
+            offset: Number of results to skip
+            
+        Returns:
+            tuple: (clinics, total_count)
+        """
+        # Get all clinics
+        all_clinics = self.list_all_clinics()
+        
+        # Filter by status if provided
+        if status:
+            all_clinics = [c for c in all_clinics if hasattr(c, 'verification_status') and c.verification_status == status]
+        
+        # Get total count before pagination
+        total_count = len(all_clinics)
+        
+        # Apply pagination
+        paginated = all_clinics[offset:offset + limit]
+        
+        return paginated, total_count
 
     # ========== FR-22: Verification Workflow ==========
     

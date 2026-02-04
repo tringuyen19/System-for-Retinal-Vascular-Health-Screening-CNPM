@@ -17,6 +17,9 @@ from domain.models.ipayment_repository import IPaymentRepository
 from domain.models.isubscription_repository import ISubscriptionRepository
 from domain.models.iai_model_version_repository import IAiModelVersionRepository
 from domain.exceptions import NotFoundException
+from infrastructure.repositories.permission_repository import PermissionRepository
+from infrastructure.repositories.ai_config_repository import AiConfigRepository
+from services.role_service import RoleService
 
 
 class AdminService:
@@ -32,7 +35,10 @@ class AdminService:
                  result_repository: IAiResultRepository,
                  payment_repository: IPaymentRepository,
                  subscription_repository: ISubscriptionRepository,
-                 model_version_repository: IAiModelVersionRepository):
+                 model_version_repository: IAiModelVersionRepository,
+                 permission_repository: PermissionRepository = None,
+                 role_service: RoleService = None,
+                 ai_config_repository: AiConfigRepository = None):
         self.account_repository = account_repository
         self.clinic_repository = clinic_repository
         self.patient_repository = patient_repository
@@ -43,6 +49,9 @@ class AdminService:
         self.payment_repository = payment_repository
         self.subscription_repository = subscription_repository
         self.model_version_repository = model_version_repository
+        self.permission_repository = permission_repository
+        self.role_service = role_service
+        self.ai_config_repository = ai_config_repository
       
         # Retraining policies storage (in-memory, can be persisted to file/DB later)
         self._retraining_policies = {
@@ -631,3 +640,403 @@ class AdminService:
         }
         
         return self._communication_policies[notification_type].copy()
+    
+    # ========== FR-31: Manage Accounts, Doctors, Clinics ==========
+    
+    def list_accounts_paginated(self, status: Optional[str] = None,
+                               role_id: Optional[int] = None,
+                               limit: int = 20, offset: int = 0) -> tuple:
+        """
+        List accounts with pagination and filtering (FR-31)
+        
+        Args:
+            status: Filter by status
+            role_id: Filter by role
+            limit: Results per page
+            offset: Results to skip
+            
+        Returns:
+            tuple: (accounts, total_count)
+        """
+        # Use repository method if available, otherwise fall back to manual filtering
+        all_accounts = self.account_repository.get_all()
+        
+        # Filter by status
+        if status:
+            all_accounts = [a for a in all_accounts if hasattr(a, 'status') and a.status == status]
+        
+        # Filter by role
+        if role_id:
+            all_accounts = [a for a in all_accounts if hasattr(a, 'role_id') and a.role_id == role_id]
+        
+        total_count = len(all_accounts)
+        paginated = all_accounts[offset:offset + limit]
+        
+        return paginated, total_count
+    
+    def list_doctors_paginated(self, specialization: Optional[str] = None,
+                              limit: int = 20, offset: int = 0) -> tuple:
+        """
+        List doctors with pagination and filtering (FR-31)
+        
+        Args:
+            specialization: Filter by specialization
+            limit: Results per page
+            offset: Results to skip
+            
+        Returns:
+            tuple: (doctors, total_count)
+        """
+        all_doctors = self.doctor_repository.get_all()
+        
+        # Filter by specialization
+        if specialization:
+            all_doctors = [d for d in all_doctors if hasattr(d, 'specialization') and d.specialization == specialization]
+        
+        total_count = len(all_doctors)
+        paginated = all_doctors[offset:offset + limit]
+        
+        return paginated, total_count
+    
+    def list_clinics_paginated(self, status: Optional[str] = None,
+                              limit: int = 20, offset: int = 0) -> tuple:
+        """
+        List clinics with pagination and filtering (FR-31)
+        
+        Args:
+            status: Filter by status
+            limit: Results per page
+            offset: Results to skip
+            
+        Returns:
+            tuple: (clinics, total_count)
+        """
+        all_clinics = self.clinic_repository.get_all()
+        
+        # Filter by status
+        if status:
+            all_clinics = [c for c in all_clinics if hasattr(c, 'verification_status') and c.verification_status == status]
+        
+        total_count = len(all_clinics)
+        paginated = all_clinics[offset:offset + limit]
+        
+        return paginated, total_count
+    
+    def update_account(self, account_id: int, **kwargs) -> Any:
+        """Update account (FR-31)"""
+        return self.account_repository.update(account_id, **kwargs)
+    
+    def delete_account(self, account_id: int) -> bool:
+        """Delete account (FR-31)"""
+        return self.account_repository.delete(account_id)
+    
+    def update_doctor(self, doctor_id: int, **kwargs) -> Any:
+        """Update doctor (FR-31)"""
+        return self.doctor_repository.update(doctor_id, **kwargs)
+    
+    def delete_doctor(self, doctor_id: int) -> bool:
+        """Delete doctor (FR-31)"""
+        return self.doctor_repository.delete(doctor_id)
+    
+    def update_clinic(self, clinic_id: int, **kwargs) -> Any:
+        """Update clinic (FR-31)"""
+        return self.clinic_repository.update(clinic_id, **kwargs)
+    
+    def delete_clinic(self, clinic_id: int) -> bool:
+        """Delete clinic (FR-31)"""
+        return self.clinic_repository.delete(clinic_id)
+    
+    # ========== Role & Permission Management Methods (FR-32) ==========
+    
+    def list_roles(self, limit: int = 50, offset: int = 0) -> tuple:
+        """List all roles with pagination (FR-32)"""
+        if not self.role_service:
+            raise RuntimeError("Role service not configured")
+        
+        roles = self.role_service.list_all_roles()
+        total = len(roles)
+        
+        # Apply pagination
+        paginated_roles = roles[offset:offset + limit]
+        return (paginated_roles, total)
+    
+    def create_role(self, role_name: str) -> Any:
+        """Create a new role (FR-32)"""
+        if not self.role_service:
+            raise RuntimeError("Role service not configured")
+        
+        return self.role_service.create_role(role_name)
+    
+    def update_role(self, role_id: int, role_name: str) -> Any:
+        """Update role (FR-32)"""
+        if not self.role_service:
+            raise RuntimeError("Role service not configured")
+        
+        return self.role_service.update_role(role_id, role_name)
+    
+    def delete_role(self, role_id: int) -> bool:
+        """Delete role (FR-32)"""
+        if not self.role_service:
+            raise RuntimeError("Role service not configured")
+        
+        # First revoke all permissions, then delete role
+        self.role_service.revoke_all_permissions(role_id)
+        return self.role_service.delete_role(role_id)
+    
+    def assign_permission(self, role_id: int, resource: str, action: str) -> Dict[str, Any]:
+        """Assign permission to role (FR-32)"""
+        if not self.role_service:
+            raise RuntimeError("Role service not configured")
+        
+        return self.role_service.assign_permission(role_id, resource, action)
+    
+    def get_role_permissions(self, role_id: int) -> List[Dict[str, Any]]:
+        """Get all permissions for a role (FR-32)"""
+        if not self.role_service:
+            raise RuntimeError("Role service not configured")
+        
+        return self.role_service.get_role_permissions(role_id)
+    
+    def revoke_permission(self, role_id: int, resource: str, action: str) -> bool:
+        """Revoke permission from role (FR-32)"""
+        if not self.role_service:
+            raise RuntimeError("Role service not configured")
+        
+        return self.role_service.revoke_permission(role_id, resource, action)
+    
+    def check_role_permission(self, role_id: int, resource: str, action: str) -> bool:
+        """Check if role has permission (FR-32)"""
+        if not self.role_service:
+            return False
+        
+        return self.role_service.has_permission(role_id, resource, action)
+    
+    # ========== AI Model Management Methods (FR-33) ==========
+    
+    def list_ai_models(self, limit: int = 50, offset: int = 0) -> tuple:
+        """
+        List all AI model versions with pagination (FR-33)
+        
+        Args:
+            limit: Results per page
+            offset: Page offset
+        
+        Returns:
+            tuple: (models_list, total_count)
+        """
+        if not self.model_version_repository:
+            raise RuntimeError("Model version repository not configured")
+        
+        models = self.model_version_repository.get_all()
+        total = len(models)
+        
+        # Apply pagination
+        paginated = models[offset:offset + limit]
+        return (paginated, total)
+    
+    def create_ai_model(self, model_name: str, version: str, threshold_config: str, 
+                       active_flag: bool = False) -> Any:
+        """
+        Create new AI model version (FR-33)
+        
+        Args:
+            model_name: Model name
+            version: Version string (e.g., v2.0)
+            threshold_config: JSON threshold configuration
+            active_flag: Whether to set as active
+        
+        Returns:
+            Created model object
+        """
+        if not self.model_version_repository:
+            raise RuntimeError("Model version repository not configured")
+        
+        # If activating, deactivate other models
+        if active_flag:
+            active_model = self.model_version_repository.get_active_model()
+            if active_model:
+                self.model_version_repository.set_active(active_model.ai_model_version_id)
+        
+        return self.model_version_repository.add(
+            model_name=model_name,
+            version=version,
+            threshold_config=threshold_config,
+            trained_at=datetime.now(),
+            active_flag=active_flag
+        )
+    
+    def activate_ai_model(self, model_version_id: int) -> Any:
+        """
+        Activate a model version and deactivate others (FR-33)
+        
+        Args:
+            model_version_id: Model version ID to activate
+        
+        Returns:
+            Activated model object
+        """
+        if not self.model_version_repository:
+            raise RuntimeError("Model version repository not configured")
+        
+        # Deactivate currently active model
+        active = self.model_version_repository.get_active_model()
+        if active:
+            self.model_version_repository.set_active(active.ai_model_version_id)
+        
+        # Activate new model
+        return self.model_version_repository.set_active(model_version_id)
+    
+    def get_ai_model_details(self, model_version_id: int) -> Dict[str, Any]:
+        """
+        Get detailed information about an AI model (FR-33)
+        
+        Args:
+            model_version_id: Model version ID
+        
+        Returns:
+            Dict with model details and config
+        """
+        if not self.model_version_repository or not self.ai_config_repository:
+            raise RuntimeError("Required repositories not configured")
+        
+        model = self.model_version_repository.get_by_id(model_version_id)
+        if not model:
+            return None
+        
+        # Get config
+        config = self.ai_config_repository.get_by_model_version(model_version_id)
+        
+        return {
+            'model_id': model.ai_model_version_id,
+            'model_name': model.model_name,
+            'version': model.version,
+            'threshold_config': model.threshold_config,
+            'active_flag': model.active_flag,
+            'trained_at': model.trained_at.isoformat() if model.trained_at else None,
+            'config': config.to_dict() if config else None
+        }
+    
+    def update_ai_threshold(self, model_version_id: int, config_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Update threshold configuration for a model (FR-33)
+        
+        Args:
+            model_version_id: Model version ID
+            config_data: Updated config data
+        
+        Returns:
+            Updated configuration
+        """
+        if not self.ai_config_repository:
+            raise RuntimeError("AI config repository not configured")
+        
+        config = self.ai_config_repository.get_by_model_version(model_version_id)
+        if not config:
+            # Create new config if doesn't exist
+            config = self.ai_config_repository.add(model_version_id, config_data)
+        else:
+            # Update existing config
+            config = self.ai_config_repository.update(config.config_id, **config_data)
+        
+        return config.to_dict() if config else None
+    
+    def update_ai_retrain_policy(self, model_version_id: int, policy_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Update auto-retrain policy for a model (FR-33)
+        
+        Args:
+            model_version_id: Model version ID
+            policy_data: Updated policy data
+                {
+                    'auto_retrain_enabled': bool,
+                    'retrain_threshold': float,
+                    'retrain_schedule': str,
+                    'max_error_rate': float,
+                    'performance_metric': str
+                }
+        
+        Returns:
+            Updated policy
+        """
+        if not self.ai_config_repository:
+            raise RuntimeError("AI config repository not configured")
+        
+        config = self.ai_config_repository.get_by_model_version(model_version_id)
+        if not config:
+            # Create new config with policy
+            config = self.ai_config_repository.add(model_version_id, policy_data)
+        else:
+            # Update existing config
+            config = self.ai_config_repository.update(config.config_id, **policy_data)
+        
+        return config.to_dict() if config else None
+    
+    def get_ai_deployment_history(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """
+        Get deployment history of AI models (FR-33)
+        
+        Args:
+            limit: Number of recent deployments to return
+        
+        Returns:
+            List of deployment records with timestamps
+        """
+        if not self.model_version_repository:
+            raise RuntimeError("Model version repository not configured")
+        
+        models = self.model_version_repository.get_all()
+        if not models:
+            return []
+        
+        # Sort by trained_at descending
+        sorted_models = sorted(models, key=lambda m: m.trained_at, reverse=True)
+        
+        history = []
+        for model in sorted_models[:limit]:
+            history.append({
+                'model_id': model.ai_model_version_id,
+                'model_name': model.model_name,
+                'version': model.version,
+                'trained_at': model.trained_at.isoformat() if model.trained_at else None,
+                'active_flag': model.active_flag,
+                'status': 'active' if model.active_flag else 'inactive'
+            })
+        
+        return history
+    
+    def rollback_ai_model(self, current_model_id: int) -> Any:
+        """
+        Rollback to the previous AI model version (FR-33)
+        
+        Args:
+            current_model_id: Current active model ID
+        
+        Returns:
+            Previous model that was activated
+        """
+        if not self.model_version_repository:
+            raise RuntimeError("Model version repository not configured")
+        
+        # Get all models sorted by training date
+        models = self.model_version_repository.get_all()
+        if len(models) < 2:
+            raise ValueError("Cannot rollback: Less than 2 model versions exist")
+        
+        # Find the model to rollback from
+        current = self.model_version_repository.get_by_id(current_model_id)
+        if not current:
+            raise ValueError(f"Current model {current_model_id} not found")
+        
+        # Find previous model (closest trained date before current)
+        previous = None
+        for model in sorted(models, key=lambda m: m.trained_at, reverse=True):
+            if model.trained_at < current.trained_at:
+                previous = model
+                break
+        
+        if not previous:
+            raise ValueError("No previous model version available for rollback")
+        
+        # Activate previous model
+        return self.activate_ai_model(previous.ai_model_version_id)
+        return self.role_service.has_permission(role_id, resource, action)

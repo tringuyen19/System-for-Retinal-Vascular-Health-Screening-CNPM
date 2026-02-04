@@ -619,6 +619,24 @@
     return res.data;
   }
 
+  /** Admin: danh sách permissions của role (GET /api/roles/:id/permissions) */
+  async function getPermissionsByRole(roleId) {
+    const res = await request('GET', '/api/roles/' + roleId + '/permissions');
+    return res.data;
+  }
+
+  /** Admin: assign permissions cho role (POST /api/roles/:id/permissions) body: { permission_ids: [] } */
+  async function assignPermissionsToRole(roleId, permissionIds) {
+    const res = await request('POST', '/api/roles/' + roleId + '/permissions', { permission_ids: permissionIds });
+    return res.data;
+  }
+
+  /** Admin: revoke permissions từ role (DELETE /api/roles/:id/permissions/:resource/:action) */
+  async function revokePermissionFromRole(roleId, resource, action) {
+    const res = await request('DELETE', '/api/roles/' + roleId + '/permissions/' + resource + '/' + action);
+    return res.data;
+  }
+
   // ---------- Admin: Clinics (verify/reject/approve/suspend) ----------
   /** Admin: danh sách phòng khám có lọc (GET /api/clinics?status=) */
   async function listClinics(status) {
@@ -877,6 +895,9 @@
     createRole,
     updateRole,
     deleteRole,
+    getPermissionsByRole,
+    assignPermissionsToRole,
+    revokePermissionFromRole,
     listClinics,
     getPendingClinics,
     verifyClinic,
@@ -904,5 +925,36 @@
     updateAdminPrivacySettings,
     getAdminCommunicationPolicies,
     updateAdminCommunicationPolicy,
+    // Service Packages API (FR-34)
+    getServicePackages: function () {
+      return fetch(AURA_API + '/api/service-packages', {
+        headers: AuraAuth.authHeader()
+      }).then(res => res.json());
+    },
+    getServicePackageById: function (id) {
+      return fetch(AURA_API + '/api/service-packages/' + id, {
+        headers: AuraAuth.authHeader()
+      }).then(res => res.json());
+    },
+    createServicePackage: function (data) {
+      return fetch(AURA_API + '/api/service-packages', {
+        method: 'POST',
+        headers: { ...AuraAuth.authHeader(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      }).then(res => res.json());
+    },
+    updateServicePackage: function (data) {
+      return fetch(AURA_API + '/api/service-packages/' + data.id, {
+        method: 'PUT',
+        headers: { ...AuraAuth.authHeader(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      }).then(res => res.json());
+    },
+    deleteServicePackage: function (id) {
+      return fetch(AURA_API + '/api/service-packages/' + id, {
+        method: 'DELETE',
+        headers: AuraAuth.authHeader()
+      }).then(res => res.json());
+    },
   };
 })();

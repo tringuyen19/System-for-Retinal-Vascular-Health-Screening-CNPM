@@ -16,8 +16,12 @@ from infrastructure.repositories.ai_result_repository import AiResultRepository
 from infrastructure.repositories.payment_repository import PaymentRepository
 from infrastructure.repositories.subscription_repository import SubscriptionRepository
 from infrastructure.repositories.ai_model_version_repository import AiModelVersionRepository
+from infrastructure.repositories.permission_repository import PermissionRepository
+from infrastructure.repositories.role_repository import RoleRepository
+from infrastructure.repositories.ai_config_repository import AiConfigRepository
 from infrastructure.databases.mssql import session
 from services.admin_service import AdminService
+from services.role_service import RoleService
 from api.responses import success_response, error_response, validation_error_response
 from api.schemas import (
     AdminDashboardResponseSchema, 
@@ -42,6 +46,12 @@ result_repo = AiResultRepository(session)
 payment_repo = PaymentRepository(session)
 subscription_repo = SubscriptionRepository(session)
 model_version_repo = AiModelVersionRepository(session)
+permission_repo = PermissionRepository(session)
+role_repo = RoleRepository(session)
+ai_config_repo = AiConfigRepository(session)
+
+# Initialize RoleService (needed for AdminService)
+role_service = RoleService(role_repo, permission_repo)
 
 # Initialize SERVICE (Business Logic Layer) ✅
 admin_service = AdminService(
@@ -54,7 +64,10 @@ admin_service = AdminService(
     result_repository=result_repo,
     payment_repository=payment_repo,
     subscription_repository=subscription_repo,
-    model_version_repository=model_version_repo
+    model_version_repository=model_version_repo,
+    permission_repository=permission_repo,
+    role_service=role_service,
+    ai_config_repository=ai_config_repo
 )
 
 
@@ -610,5 +623,1041 @@ def create_communication_policy(notification_type):
         return validation_error_response(e.messages)
     except ValueError as e:
         return error_response(str(e), 400)
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+# ========== FR-31: Manage Accounts, Doctors, and Clinics ==========
+
+@admin_bp.route('/accounts', methods=['GET'])
+@require_role('Admin')
+def list_accounts():
+    """
+    List all accounts with filter and pagination (FR-31)
+    ---
+    tags:
+      - Admin
+    security:
+      - Bearer: []
+    parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [active, inactive, suspended]
+        description: Filter by account status
+      - name: role_id
+        in: query
+        required: false
+        schema:
+          type: integer
+        description: Filter by role ID
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 20
+        description: Number of results per page
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 1
+        description: Page number
+    responses:
+      200:
+        description: Accounts retrieved successfully
+    """
+    try:
+        status = request.args.get('status', None)
+        role_id = request.args.get('role_id', None, type=int)
+        limit = request.args.get('limit', 20, type=int)
+        page = request.args.get('page', 1, type=int)
+        offset = (page - 1) * limit
+        
+        accounts, total_count = admin_service.list_accounts_paginated(
+            status=status, role_id=role_id, limit=limit, offset=offset
+        )
+        
+        return success_response({
+            'accounts': [{'account_id': a.account_id, 'email': a.email, 'role_id': a.role_id, 'status': a.status, 'clinic_id': a.clinic_id} for a in accounts],
+            'total': total_count,
+            'page': page,
+            'limit': limit,
+            'pages': (total_count + limit - 1) // limit
+        }, "Accounts retrieved successfully")
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/accounts/<int:account_id>', methods=['PUT'])
+@require_role('Admin')
+def update_account(account_id: int):
+    """
+    Update account (FR-31)
+    ---
+    tags:
+      - Admin
+    security:
+      - Bearer: []
+    parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    consumes:
+      - application/json
+    responses:
+      200:
+        description: Account updated successfully
+    """
+    try:
+        data = request.get_json()
+        updated_account = admin_service.update_account(account_id, **data)
+        if not updated_account:
+            return error_response("Account not found", 404)
+        
+        return success_response({'account_id': updated_account.account_id, 'email': updated_account.email, 'status': updated_account.status}, 
+                               "Account updated successfully")
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/accounts/<int:account_id>', methods=['DELETE'])
+@require_role('Admin')
+def delete_account(account_id: int):
+    """
+    Delete account (FR-31)
+    ---
+    tags:
+      - Admin
+    security:
+      - Bearer: []
+    parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    responses:
+      200:
+        description: Account deleted successfully
+    """
+    try:
+        result = admin_service.delete_account(account_id)
+        if not result:
+            return error_response("Account not found", 404)
+        
+        return success_response({'deleted': True}, "Account deleted successfully")
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/doctors', methods=['GET'])
+@require_role('Admin')
+def list_doctors():
+    """
+    List all doctors with filter and pagination (FR-31)
+    ---
+    tags:
+      - Admin
+    security:
+      - Bearer: []
+    parameters:
+      - name: specialization
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Filter by specialization
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 20
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 1
+    responses:
+      200:
+        description: Doctors retrieved successfully
+    """
+    try:
+        specialization = request.args.get('specialization', None)
+        limit = request.args.get('limit', 20, type=int)
+        page = request.args.get('page', 1, type=int)
+        offset = (page - 1) * limit
+        
+        doctors, total_count = admin_service.list_doctors_paginated(
+            specialization=specialization, limit=limit, offset=offset
+        )
+        
+        return success_response({
+            'doctors': [{'doctor_id': d.doctor_id, 'account_id': d.account_id, 'doctor_name': d.doctor_name, 'specialization': d.specialization, 'license_number': d.license_number} for d in doctors],
+            'total': total_count,
+            'page': page,
+            'limit': limit,
+            'pages': (total_count + limit - 1) // limit
+        }, "Doctors retrieved successfully")
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/doctors/<int:doctor_id>', methods=['PUT'])
+@require_role('Admin')
+def update_doctor(doctor_id: int):
+    """
+    Update doctor (FR-31)
+    ---
+    tags:
+      - Admin
+    security:
+      - Bearer: []
+    parameters:
+      - name: doctor_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    consumes:
+      - application/json
+    responses:
+      200:
+        description: Doctor updated successfully
+    """
+    try:
+        data = request.get_json()
+        updated_doctor = admin_service.update_doctor(doctor_id, **data)
+        if not updated_doctor:
+            return error_response("Doctor not found", 404)
+        
+        return success_response({'doctor_id': updated_doctor.doctor_id, 'doctor_name': updated_doctor.doctor_name, 'specialization': updated_doctor.specialization}, 
+                               "Doctor updated successfully")
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/doctors/<int:doctor_id>', methods=['DELETE'])
+@require_role('Admin')
+def delete_doctor(doctor_id: int):
+    """
+    Delete doctor (FR-31)
+    ---
+    tags:
+      - Admin
+    security:
+      - Bearer: []
+    parameters:
+      - name: doctor_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    responses:
+      200:
+        description: Doctor deleted successfully
+    """
+    try:
+        result = admin_service.delete_doctor(doctor_id)
+        if not result:
+            return error_response("Doctor not found", 404)
+        
+        return success_response({'deleted': True}, "Doctor deleted successfully")
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/clinics', methods=['GET'])
+@require_role('Admin')
+def list_clinics():
+    """
+    List all clinics with filter and pagination (FR-31)
+    ---
+    tags:
+      - Admin
+    security:
+      - Bearer: []
+    parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [pending, verified, rejected, suspended]
+        description: Filter by clinic status
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 20
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 1
+    responses:
+      200:
+        description: Clinics retrieved successfully
+    """
+    try:
+        status = request.args.get('status', None)
+        limit = request.args.get('limit', 20, type=int)
+        page = request.args.get('page', 1, type=int)
+        offset = (page - 1) * limit
+        
+        clinics, total_count = admin_service.list_clinics_paginated(
+            status=status, limit=limit, offset=offset
+        )
+        
+        return success_response({
+            'clinics': [{'clinic_id': c.clinic_id, 'name': c.name, 'address': c.address, 'phone': c.phone, 'verification_status': c.verification_status} for c in clinics],
+            'total': total_count,
+            'page': page,
+            'limit': limit,
+            'pages': (total_count + limit - 1) // limit
+        }, "Clinics retrieved successfully")
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/clinics/<int:clinic_id>', methods=['PUT'])
+@require_role('Admin')
+def update_clinic(clinic_id: int):
+    """
+    Update clinic (FR-31)
+    ---
+    tags:
+      - Admin
+    security:
+      - Bearer: []
+    parameters:
+      - name: clinic_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    consumes:
+      - application/json
+    responses:
+      200:
+        description: Clinic updated successfully
+    """
+    try:
+        data = request.get_json()
+        updated_clinic = admin_service.update_clinic(clinic_id, **data)
+        if not updated_clinic:
+            return error_response("Clinic not found", 404)
+        
+        return success_response({'clinic_id': updated_clinic.clinic_id, 'name': updated_clinic.name, 'verification_status': updated_clinic.verification_status}, 
+                               "Clinic updated successfully")
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/clinics/<int:clinic_id>', methods=['DELETE'])
+@require_role('Admin')
+def delete_clinic(clinic_id: int):
+    """
+    Delete clinic (FR-31)
+    ---
+    tags:
+      - Admin
+    security:
+      - Bearer: []
+    parameters:
+      - name: clinic_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    responses:
+      200:
+        description: Clinic deleted successfully
+    """
+    try:
+        result = admin_service.delete_clinic(clinic_id)
+        if not result:
+            return error_response("Clinic not found", 404)
+        
+        return success_response({'deleted': True}, "Clinic deleted successfully")
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+# ========== FR-32: Role & Permission Management Endpoints ==========
+
+@admin_bp.route('/roles', methods=['GET'])
+@require_role('Admin')
+def list_roles():
+    """
+    List all roles with pagination
+    ---
+    tags:
+      - Admin Management (FR-32)
+    parameters:
+      - in: query
+        name: limit
+        type: integer
+        default: 50
+      - in: query
+        name: offset
+        type: integer
+        default: 0
+    responses:
+      200:
+        description: List of roles retrieved
+        schema:
+          properties:
+            roles:
+              type: array
+            total:
+              type: integer
+            limit:
+              type: integer
+            offset:
+              type: integer
+    """
+    try:
+        limit = request.args.get('limit', 50, type=int)
+        offset = request.args.get('offset', 0, type=int)
+        
+        roles, total = admin_service.list_roles(limit, offset)
+        
+        return success_response({
+            'roles': [r.__dict__ if hasattr(r, '__dict__') else r for r in roles],
+            'total': total,
+            'limit': limit,
+            'offset': offset
+        }, "Roles retrieved successfully")
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/roles', methods=['POST'])
+@require_role('Admin')
+def create_role():
+    """
+    Create a new role
+    ---
+    tags:
+      - Admin Management (FR-32)
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            role_name:
+              type: string
+    responses:
+      201:
+        description: Role created successfully
+    """
+    try:
+        data = request.get_json()
+        role_name = data.get('role_name')
+        
+        if not role_name:
+            return validation_error_response({'role_name': ['Role name is required']})
+        
+        role = admin_service.create_role(role_name)
+        return success_response(role.__dict__ if hasattr(role, '__dict__') else role, 
+                              "Role created successfully", 201)
+    except ValueError as e:
+        return error_response(str(e), 409)
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/roles/<int:role_id>', methods=['PUT'])
+@require_role('Admin')
+def update_role(role_id):
+    """
+    Update a role
+    ---
+    tags:
+      - Admin Management (FR-32)
+    parameters:
+      - in: path
+        name: role_id
+        type: integer
+        required: true
+      - in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            role_name:
+              type: string
+    responses:
+      200:
+        description: Role updated successfully
+    """
+    try:
+        data = request.get_json()
+        role_name = data.get('role_name')
+        
+        if not role_name:
+            return validation_error_response({'role_name': ['Role name is required']})
+        
+        role = admin_service.update_role(role_id, role_name)
+        if not role:
+            return error_response("Role not found", 404)
+        
+        return success_response(role.__dict__ if hasattr(role, '__dict__') else role,
+                              "Role updated successfully")
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/roles/<int:role_id>', methods=['DELETE'])
+@require_role('Admin')
+def delete_role(role_id):
+    """
+    Delete a role
+    ---
+    tags:
+      - Admin Management (FR-32)
+    parameters:
+      - in: path
+        name: role_id
+        type: integer
+        required: true
+    responses:
+      200:
+        description: Role deleted successfully
+    """
+    try:
+        result = admin_service.delete_role(role_id)
+        if not result:
+            return error_response("Role not found", 404)
+        
+        return success_response({'deleted': True}, "Role deleted successfully")
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/roles/<int:role_id>/permissions', methods=['GET'])
+@require_role('Admin')
+def get_role_permissions(role_id):
+    """
+    Get all permissions for a role
+    ---
+    tags:
+      - Admin Management (FR-32)
+    parameters:
+      - in: path
+        name: role_id
+        type: integer
+        required: true
+    responses:
+      200:
+        description: List of permissions retrieved
+    """
+    try:
+        permissions = admin_service.get_role_permissions(role_id)
+        return success_response({'permissions': permissions}, 
+                              "Permissions retrieved successfully")
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/roles/<int:role_id>/permissions', methods=['POST'])
+@require_role('Admin')
+def assign_permission(role_id):
+    """
+    Assign a permission to a role
+    ---
+    tags:
+      - Admin Management (FR-32)
+    parameters:
+      - in: path
+        name: role_id
+        type: integer
+        required: true
+      - in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            resource:
+              type: string
+            action:
+              type: string
+    responses:
+      201:
+        description: Permission assigned successfully
+    """
+    try:
+        data = request.get_json()
+        resource = data.get('resource')
+        action = data.get('action')
+        
+        if not resource or not action:
+            return validation_error_response({
+                'resource': ['Resource is required'],
+                'action': ['Action is required']
+            })
+        
+        permission = admin_service.assign_permission(role_id, resource, action)
+        return success_response(permission, "Permission assigned successfully", 201)
+    except ValueError as e:
+        return error_response(str(e), 409)
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/roles/<int:role_id>/permissions/<resource>/<action>', methods=['DELETE'])
+@require_role('Admin')
+def revoke_permission(role_id, resource, action):
+    """
+    Revoke a permission from a role
+    ---
+    tags:
+      - Admin Management (FR-32)
+    parameters:
+      - in: path
+        name: role_id
+        type: integer
+        required: true
+      - in: path
+        name: resource
+        type: string
+        required: true
+      - in: path
+        name: action
+        type: string
+        required: true
+    responses:
+      200:
+        description: Permission revoked successfully
+    """
+    try:
+        result = admin_service.revoke_permission(role_id, resource, action)
+        if not result:
+            return error_response("Permission not found", 404)
+        
+        return success_response({'revoked': True}, "Permission revoked successfully")
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+# ============================================================================
+# AI MODEL CONFIGURATION ENDPOINTS (FR-33)
+# ============================================================================
+
+@admin_bp.route('/ai-models', methods=['GET'])
+@require_role('Admin')
+def list_ai_models():
+    """
+    Get paginated list of all AI model versions
+    ---
+    tags:
+      - AI Model Configuration (FR-33)
+    parameters:
+      - in: query
+        name: limit
+        type: integer
+        default: 10
+      - in: query
+        name: offset
+        type: integer
+        default: 0
+    responses:
+      200:
+        description: List of AI models retrieved successfully
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+            data:
+              type: object
+              properties:
+                models:
+                  type: array
+                  items:
+                    type: object
+                total:
+                  type: integer
+    """
+    try:
+        limit = request.args.get('limit', 10, type=int)
+        offset = request.args.get('offset', 0, type=int)
+        
+        # Validate pagination parameters
+        if limit <= 0 or offset < 0:
+            return validation_error_response({
+                'limit': ['Limit must be positive'],
+                'offset': ['Offset must be non-negative']
+            })
+        
+        models, total = admin_service.list_ai_models(limit, offset)
+        return success_response({
+            'models': [m.to_dict() if hasattr(m, 'to_dict') else m for m in models],
+            'total': total,
+            'limit': limit,
+            'offset': offset
+        }, "AI models retrieved successfully")
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/ai-models', methods=['POST'])
+@require_role('Admin')
+def create_ai_model():
+    """
+    Create a new AI model version with configuration
+    ---
+    tags:
+      - AI Model Configuration (FR-33)
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          properties:
+            model_name:
+              type: string
+              example: "Retinal Vessel Analyzer"
+            version:
+              type: string
+              example: "v2.1.0"
+            threshold_config:
+              type: object
+              properties:
+                confidence_threshold:
+                  type: number
+                  example: 0.85
+                risk_level_mapping:
+                  type: object
+                  properties:
+                    low:
+                      type: object
+                      properties:
+                        min:
+                          type: number
+                        max:
+                          type: number
+                    medium:
+                      type: object
+                    high:
+                      type: object
+                    critical:
+                      type: object
+            active_flag:
+              type: boolean
+              example: false
+    responses:
+      201:
+        description: AI model created successfully
+      400:
+        description: Invalid input
+      409:
+        description: Conflict (e.g., model version already exists)
+    """
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['model_name', 'version', 'threshold_config']
+        missing = [f for f in required_fields if f not in data]
+        if missing:
+            return validation_error_response({f: [f'{f} is required'] for f in missing})
+        
+        # Validate threshold_config structure
+        threshold_config = data['threshold_config']
+        if 'confidence_threshold' not in threshold_config or 'risk_level_mapping' not in threshold_config:
+            return validation_error_response({
+                'threshold_config': ['Must contain confidence_threshold and risk_level_mapping']
+            })
+        
+        # Validate risk_level_mapping
+        if not admin_service.ai_config_repository.validate_risk_mapping(threshold_config['risk_level_mapping']):
+            return validation_error_response({
+                'risk_level_mapping': ['Invalid risk level mapping structure or ranges']
+            })
+        
+        model = admin_service.create_ai_model(
+            model_name=data['model_name'],
+            version=data['version'],
+            threshold_config=threshold_config,
+            active_flag=data.get('active_flag', False)
+        )
+        
+        return success_response(model.to_dict() if hasattr(model, 'to_dict') else model, 
+                              "AI model created successfully", 201)
+    except ValueError as e:
+        return error_response(str(e), 409)
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/ai-models/<int:model_id>', methods=['GET'])
+@require_role('Admin')
+def get_ai_model_details(model_id):
+    """
+    Get detailed information about an AI model including its configuration
+    ---
+    tags:
+      - AI Model Configuration (FR-33)
+    parameters:
+      - in: path
+        name: model_id
+        type: integer
+        required: true
+    responses:
+      200:
+        description: Model details retrieved successfully
+      404:
+        description: Model not found
+    """
+    try:
+        details = admin_service.get_ai_model_details(model_id)
+        if not details:
+            return error_response("AI model not found", 404)
+        
+        return success_response(details, "AI model details retrieved successfully")
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/ai-models/<int:model_id>/activate', methods=['PUT'])
+@require_role('Admin')
+def activate_ai_model(model_id):
+    """
+    Activate an AI model version (deactivates current active model)
+    ---
+    tags:
+      - AI Model Configuration (FR-33)
+    parameters:
+      - in: path
+        name: model_id
+        type: integer
+        required: true
+    responses:
+      200:
+        description: AI model activated successfully
+      404:
+        description: Model not found
+    """
+    try:
+        model = admin_service.activate_ai_model(model_id)
+        if not model:
+            return error_response("AI model not found", 404)
+        
+        return success_response(model.to_dict() if hasattr(model, 'to_dict') else model,
+                              "AI model activated successfully")
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/ai-models/<int:model_id>/rollback', methods=['POST'])
+@require_role('Admin')
+def rollback_ai_model(model_id):
+    """
+    Rollback to the previous AI model version
+    ---
+    tags:
+      - AI Model Configuration (FR-33)
+    parameters:
+      - in: path
+        name: model_id
+        type: integer
+        required: true
+    responses:
+      200:
+        description: Rollback successful
+      404:
+        description: Previous model version not found
+    """
+    try:
+        previous_model = admin_service.rollback_ai_model(model_id)
+        if not previous_model:
+            return error_response("No previous model version found", 404)
+        
+        return success_response(previous_model.to_dict() if hasattr(previous_model, 'to_dict') else previous_model,
+                              "Rollback to previous model successful")
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/ai-models/<int:model_id>/threshold', methods=['PUT'])
+@require_role('Admin')
+def update_ai_threshold(model_id):
+    """
+    Update AI model threshold configuration
+    ---
+    tags:
+      - AI Model Configuration (FR-33)
+    parameters:
+      - in: path
+        name: model_id
+        type: integer
+        required: true
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          properties:
+            confidence_threshold:
+              type: number
+              example: 0.80
+            risk_level_mapping:
+              type: object
+              properties:
+                low:
+                  type: object
+                  properties:
+                    min:
+                      type: number
+                    max:
+                      type: number
+                medium:
+                  type: object
+                high:
+                  type: object
+                critical:
+                  type: object
+    responses:
+      200:
+        description: Threshold configuration updated successfully
+      400:
+        description: Invalid input
+      404:
+        description: Model not found
+    """
+    try:
+        data = request.get_json()
+        
+        # Validate input
+        if not data:
+            return validation_error_response({'body': ['Request body is required']})
+        
+        # If risk_level_mapping provided, validate it
+        if 'risk_level_mapping' in data:
+            if not admin_service.ai_config_repository.validate_risk_mapping(data['risk_level_mapping']):
+                return validation_error_response({
+                    'risk_level_mapping': ['Invalid risk level mapping structure or ranges']
+                })
+        
+        # Validate confidence_threshold if provided
+        if 'confidence_threshold' in data:
+            if not isinstance(data['confidence_threshold'], (int, float)) or \
+               not (0.0 <= data['confidence_threshold'] <= 1.0):
+                return validation_error_response({
+                    'confidence_threshold': ['Must be a number between 0.0 and 1.0']
+                })
+        
+        config = admin_service.update_ai_threshold(model_id, data)
+        if not config:
+            return error_response("AI model not found", 404)
+        
+        return success_response(config, "Threshold configuration updated successfully")
+    except ValueError as e:
+        return error_response(str(e), 409)
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@admin_bp.route('/ai-models/<int:model_id>/retrain-policy', methods=['PUT'])
+@require_role('Admin')
+def update_ai_retrain_policy(model_id):
+    """
+    Update AI model auto-retrain policy
+    ---
+    tags:
+      - AI Model Configuration (FR-33)
+    parameters:
+      - in: path
+        name: model_id
+        type: integer
+        required: true
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          properties:
+            auto_retrain_enabled:
+              type: boolean
+              example: true
+            retrain_threshold:
+              type: number
+              example: 0.05
+            retrain_schedule:
+              type: string
+              enum: ["weekly", "monthly", "quarterly"]
+              example: "weekly"
+            max_error_rate:
+              type: number
+              example: 0.15
+            performance_metric:
+              type: string
+              enum: ["accuracy", "f1_score", "auc"]
+              example: "f1_score"
+    responses:
+      200:
+        description: Retrain policy updated successfully
+      400:
+        description: Invalid input
+      404:
+        description: Model not found
+    """
+    try:
+        data = request.get_json()
+        
+        # Validate input
+        if not data:
+            return validation_error_response({'body': ['Request body is required']})
+        
+        # Validate enums if provided
+        valid_schedules = ['weekly', 'monthly', 'quarterly']
+        valid_metrics = ['accuracy', 'f1_score', 'auc']
+        
+        if 'retrain_schedule' in data and data['retrain_schedule'] not in valid_schedules:
+            return validation_error_response({
+                'retrain_schedule': [f'Must be one of {valid_schedules}']
+            })
+        
+        if 'performance_metric' in data and data['performance_metric'] not in valid_metrics:
+            return validation_error_response({
+                'performance_metric': [f'Must be one of {valid_metrics}']
+            })
+        
+        # Validate numeric ranges
+        if 'retrain_threshold' in data:
+            if not isinstance(data['retrain_threshold'], (int, float)) or \
+               not (0.0 <= data['retrain_threshold'] <= 1.0):
+                return validation_error_response({
+                    'retrain_threshold': ['Must be a number between 0.0 and 1.0']
+                })
+        
+        if 'max_error_rate' in data:
+            if not isinstance(data['max_error_rate'], (int, float)) or \
+               not (0.0 <= data['max_error_rate'] <= 1.0):
+                return validation_error_response({
+                    'max_error_rate': ['Must be a number between 0.0 and 1.0']
+                })
+        
+        policy = admin_service.update_ai_retrain_policy(model_id, data)
+        if not policy:
+            return error_response("AI model not found", 404)
+        
+        return success_response(policy, "Retrain policy updated successfully")
+    except ValueError as e:
+        return error_response(str(e), 409)
     except Exception as e:
         return error_response(f'Internal server error: {str(e)}', 500)

@@ -50,7 +50,22 @@
     <main class="flex-grow-1 p-4" style="background-color: #f5f5f5;">
       <div class="container-fluid">
         <h1 class="h3 mb-4">Quản lý tài khoản</h1>
-        <div id="pageError" class="alert alert-danger d-none"></div>
+        
+        <!-- Tabs Navigation -->
+        <ul class="nav nav-tabs mb-4" id="accountsTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-accounts" data-bs-toggle="tab" data-bs-target="#content-accounts" type="button" role="tab"><i class="bi bi-people me-2"></i>Danh sách tài khoản</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-roles" data-bs-toggle="tab" data-bs-target="#content-roles" type="button" role="tab"><i class="bi bi-shield-lock me-2"></i>Vai trò & Quyền</button>
+          </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content">
+          <!-- Tab 1: Accounts List -->
+          <div class="tab-pane fade show active" id="content-accounts" role="tabpanel">
+            <div id="pageError" class="alert alert-danger d-none"></div>
         <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
           <select id="filterRole" class="form-select form-select-sm" style="width: auto;">
             <option value="">Tất cả vai trò</option>
@@ -76,17 +91,78 @@
                     <th>Trạng thái</th>
                     <th>Clinic ID</th>
                     <th>Thao tác</th>
+                    <th>Quyền</th>
                   </tr>
                 </thead>
                 <tbody id="accountsTableBody">
-                  <tr><td colspan="6" class="text-center text-muted">Đang tải...</td></tr>
+                  <tr><td colspan="7" class="text-center text-muted">Đang tải...</td></tr>
                 </tbody>
               </table>
+            </div>
+          </div>
+          <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+            <small class="text-muted" id="paginationInfo">Trang 1</small>
+            <nav>
+              <ul class="pagination pagination-sm mb-0">
+                <li class="page-item" id="prevPageBtn"><a class="page-link" href="#" aria-label="Previous"><span aria-hidden="true">&laquo;</span></a></li>
+                <li class="page-item active" id="pageNumBtn"><span class="page-link" id="pageNum">1</span></li>
+                <li class="page-item" id="nextPageBtn"><a class="page-link" href="#" aria-label="Next"><span aria-hidden="true">&raquo;</span></a></li>
+              </ul>
+            </nav>
+          </div>
+        </div>
+
+        <!-- Tab 2: Roles & Permissions -->
+        <div class="tab-pane fade" id="content-roles" role="tabpanel">
+          <div class="row">
+            <div class="col-md-4">
+              <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                  <h5 class="mb-0">Danh sách vai trò</h5>
+                  <button type="button" class="btn btn-sm btn-success" id="btnCreateRole"><i class="bi bi-plus-lg"></i>Tạo</button>
+                </div>
+                <div class="list-group list-group-flush" id="rolesList">
+                  <div class="p-3 text-center text-muted">Đang tải...</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-8">
+              <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                  <h5 class="mb-0">Quản lý quyền - <span id="selectedRoleName" class="fw-bold text-primary">Chọn vai trò</span></h5>
+                </div>
+                <div class="card-body">
+                  <input type="hidden" id="selectedRoleId" value="">
+                  <div id="permissionsMatrix"></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </main>
+  </div>
+
+  <!-- Permissions Modal -->
+  <div class="modal fade" id="modalPermissions" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Quản lý quyền - <span id="permAccountEmail"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="permAccountId" value="">
+          <input type="hidden" id="permRoleId" value="">
+          <div class="alert alert-info small"><i class="bi bi-info-circle me-2"></i>Chọn các quyền cho vai trò này</div>
+          <div id="permissionsContainer" class="row g-3"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+          <button type="button" class="btn btn-primary" id="btnSavePermissions">Lưu quyền</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="modal fade" id="modalAccount" tabindex="-1">
@@ -144,5 +220,6 @@
   <script src="../js/components/sidebar.js"></script>
   <script src="../js/components/alert.js"></script>
   <script src="../js/pages/admin-accounts.js"></script>
+  <script src="../js/pages/admin-roles-permissions.js"></script>
 </body>
 </html>

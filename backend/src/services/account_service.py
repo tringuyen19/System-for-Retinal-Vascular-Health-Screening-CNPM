@@ -176,3 +176,37 @@ class AccountService:
     def get_accounts_by_clinic(self, clinic_id: int) -> List[Account]:
         """Get all accounts in a clinic"""
         return self.repository.get_by_clinic(clinic_id)
+    
+    def list_accounts_paginated(self, status: Optional[str] = None, 
+                                role_id: Optional[int] = None,
+                                limit: int = 20, offset: int = 0) -> tuple:
+        """
+        List accounts with pagination and filtering (FR-31)
+        
+        Args:
+            status: Filter by status (active, inactive, suspended)
+            role_id: Filter by role
+            limit: Number of results per page
+            offset: Number of results to skip
+            
+        Returns:
+            tuple: (accounts, total_count)
+        """
+        # Get all accounts
+        all_accounts = self.list_all_accounts()
+        
+        # Filter by status
+        if status:
+            all_accounts = [a for a in all_accounts if hasattr(a, 'status') and a.status == status]
+        
+        # Filter by role
+        if role_id:
+            all_accounts = [a for a in all_accounts if hasattr(a, 'role_id') and a.role_id == role_id]
+        
+        # Get total count before pagination
+        total_count = len(all_accounts)
+        
+        # Apply pagination
+        paginated = all_accounts[offset:offset + limit]
+        
+        return paginated, total_count

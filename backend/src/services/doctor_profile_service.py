@@ -174,3 +174,31 @@ class DoctorProfileService:
         conversation_score = min(conversations / 50, 1.0) * 0.2  # Normalize to max 50 conversations
         
         return round((review_score + report_score + conversation_score) * 100, 2)
+    
+    def list_doctors_paginated(self, specialization: Optional[str] = None,
+                               limit: int = 20, offset: int = 0) -> tuple:
+        """
+        List doctors with pagination and filtering (FR-31)
+        
+        Args:
+            specialization: Filter by specialization
+            limit: Number of results per page
+            offset: Number of results to skip
+            
+        Returns:
+            tuple: (doctors, total_count)
+        """
+        # Get all doctors
+        all_doctors = self.list_all_doctors()
+        
+        # Filter by specialization if provided
+        if specialization:
+            all_doctors = [d for d in all_doctors if hasattr(d, 'specialization') and d.specialization == specialization]
+        
+        # Get total count before pagination
+        total_count = len(all_doctors)
+        
+        # Apply pagination
+        paginated = all_doctors[offset:offset + limit]
+        
+        return paginated, total_count

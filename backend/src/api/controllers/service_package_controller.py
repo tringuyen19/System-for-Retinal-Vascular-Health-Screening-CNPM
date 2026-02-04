@@ -110,35 +110,49 @@ def create_package():
         return error_response(f'Internal server error: {str(e)}', 500)
 
 
-@service_package_bp.route('/<int:package_id>', methods=['GET'])
-def get_package(package_id):
+@service_package_bp.route('', methods=['GET'])
+@require_role('Admin')
+def list_packages():
     """
-    Get package by ID
+    List all service packages
     ---
     tags:
       - Service Package
-    parameters:
-      - name: package_id
-        in: path
-        required: true
-        schema:
-          type: integer
+    security:
+      - Bearer: []
     responses:
       200:
-        description: Package found
-      404:
-        description: Package not found
+        description: List of service packages
     """
-    try:
-        package = package_service.get_package_by_id(package_id)
-        if not package:
-            return not_found_response('Package not found')
-        
-        schema = ServicePackageResponseSchema()
-        return success_response(schema.dump(package))
-        
-    except Exception as e:
-        return error_response(f'Internal server error: {str(e)}', 500)
+    packages = package_service.list_all_packages()
+    schema = ServicePackageResponseSchema(many=True)
+    return success_response(schema.dump(packages), "Service packages retrieved successfully")
+
+
+@service_package_bp.route('/<int:package_id>', methods=['GET'])
+@require_role('Admin')
+def get_package(package_id):
+    """
+    Get a service package by ID
+    ---
+    tags:
+      - Service Package
+    security:
+      - Bearer: []
+    parameters:
+      - in: path
+        name: package_id
+        required: true
+        type: integer
+    responses:
+      200:
+        description: Service package details
+    """
+    package = package_service.get_package_by_id(package_id)
+    if not package:
+        return not_found_response("Service package not found")
+    schema = ServicePackageResponseSchema()
+    return success_response(schema.dump(package), "Service package retrieved successfully")
 
 
 @service_package_bp.route('/name/<name>', methods=['GET'])
@@ -282,87 +296,39 @@ def get_most_expensive():
 @require_role('Admin')
 def update_package(package_id):
     """
-    Update package
+    Update a service package
     ---
     tags:
       - Service Package
     security:
       - Bearer: []
     parameters:
-      - name: package_id
-        in: path
+      - in: path
+        name: package_id
         required: true
-        schema:
-          type: integer
-    consumes:
-      - application/json
-    produces:
-      - application/json
-    parameters:
-      - name: package_id
-        in: path
-        required: true
-        schema:
-          type: integer
-          example: 1
+        type: integer
       - in: body
         name: body
-        required: false
+        required: true
         schema:
-          type: object
-          properties:
-            name:
-              type: string
-              example: "Updated Package Name"
-            price:
-              type: number
-              format: float
-              example: 149000.00
-            image_limit:
-              type: integer
-              example: 200
-            duration_days:
-              type: integer
-              example: 60
+          $ref: '#/definitions/ServicePackageUpdateRequestSchema'
     responses:
       200:
-        description: Package updated successfully
-        schema:
-          type: object
-          properties:
-            message:
-              type: string
-              example: Package updated successfully
-            data:
-              type: object
-      404:
-        description: Package not found
+        description: Service package updated
     """
     try:
         data = request.get_json()
-        
-        # If updating name, check if it already exists
-        if data.get('name'):
-            existing = package_service.get_package_by_name(data['name'])
-            if existing and existing.package_id != package_id:
-                return error_response('Package name already exists', 400)
-        
-        package = package_service.update_package(package_id, **data)
-        if not package:
-            return not_found_response('Package not found')
-        
-        return success_response({
-            'package_id': package.package_id,
-            'name': package.name,
-            'price': float(package.price),
-            'image_limit': package.image_limit,
-            'duration_days': package.duration_days
-        }, 'Package updated successfully')
-        
-    except ValueError as e:
-        return error_response(str(e), 400)
+        schema = ServicePackageUpdateRequestSchema()
+        validated_data = schema.load(data)
+        updated_package = package_service.update_package(package_id, **validated_data)
+        if not updated_package:
+            return not_found_response("Service package not found")
+        response_schema = ServicePackageResponseSchema()
+        return success_response(response_schema.dump(updated_package), "Service package updated successfully")
+    except ValidationError as e:
+        return validation_error_response(e.messages)
     except Exception as e:
-        return error_response(f'Internal server error: {str(e)}', 500)
+        return error_response(str(e))
 
 
 @service_package_bp.route('/<int:package_id>/price', methods=['PUT'])
@@ -444,35 +410,28 @@ def update_price(package_id):
 @require_role('Admin')
 def delete_package(package_id):
     """
-    Delete package
+    Delete a service package
     ---
     tags:
       - Service Package
     security:
       - Bearer: []
     parameters:
-      - name: package_id
-        in: path
+      - in: path
+        name: package_id
         required: true
-        schema:
-          type: integer
+        type: integer
     responses:
       200:
-        description: Package deleted successfully
-      404:
-        description: Package not found
+        description: Service package deleted
     """
     try:
-        result = package_service.delete_package(package_id)
-        if not result:
-            return not_found_response('Package not found')
-        
-        return success_response(None, 'Package deleted successfully')
-        
-    except ValueError as e:
-        return error_response(str(e), 400)
+        deleted = package_service.delete_package(package_id)
+        if not deleted:
+            return not_found_response("Service package not found")
+        return success_response({}, "Service package deleted successfully")
     except Exception as e:
-        return error_response(f'Internal server error: {str(e)}', 500)
+        return error_response(str(e))
 
 
 @service_package_bp.route('/stats', methods=['GET'])
