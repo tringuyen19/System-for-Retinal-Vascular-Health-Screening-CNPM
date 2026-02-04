@@ -16,6 +16,15 @@ class Config:
     # Static uploads (served via Flask default /static/*)
     STATIC_UPLOAD_DIR = os.environ.get('STATIC_UPLOAD_DIR') or os.path.join(os.path.dirname(__file__), 'static', 'uploads')
 
+    # Google OAuth (FR-1: Login bằng tài khoản Google)
+    # Cần cấu hình trong .env khi triển khai thật.
+    GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID') or ''
+    GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET') or ''
+    # Callback URL phía backend - phải trùng với cấu hình trên Google Cloud Console
+    GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI') or 'http://localhost:9999/api/auth/google/callback'
+    # Frontend base URL để redirect sau khi login Google xong
+    FRONTEND_BASE_URL = os.environ.get('FRONTEND_BASE_URL') or 'http://localhost:8080'
+
 class DevelopmentConfig(Config):
     """Development configuration."""
     DEBUG = True

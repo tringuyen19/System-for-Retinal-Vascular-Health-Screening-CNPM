@@ -114,6 +114,75 @@
     window.location.href = origin ? origin + fullPath : fullPath;
   }
 
+  /**
+   * Redirect theo role, nhưng với Patient và Doctor role thì kiểm tra profile trước.
+   * Nếu chưa có profile, redirect đến setup-profile.html thay vì dashboard.
+   */
+  async function redirectByRoleWithProfileCheck() {
+    const role = getRole();
+    const user = getUser();
+    const accountId = user && user.account_id;
+    
+    if (!accountId) {
+      // Không có account_id, redirect bình thường
+      redirectByRole();
+      return;
+    }
+
+    // Nếu là Patient, kiểm tra xem đã có profile chưa
+    if (role === 'Patient') {
+      try {
+        // Kiểm tra xem đã có patient profile chưa
+        if (window.AuraAPI && window.AuraAPI.getPatientByAccount) {
+          const patient = await window.AuraAPI.getPatientByAccount(accountId);
+          if (patient && patient.patient_id) {
+            // Đã có profile, redirect đến dashboard
+            redirectByRole();
+            return;
+          }
+        }
+      } catch (err) {
+        // Nếu lỗi (404 hoặc network), giả sử chưa có profile
+        console.log('Chưa có patient profile hoặc lỗi khi kiểm tra:', err);
+      }
+
+      // Chưa có profile, redirect đến setup-profile.html
+      const origin = window.location.origin || '';
+      const basePath = (window.location.pathname || '').replace(/\/[^/]*$/, '') || '';
+      const setupPath = (basePath ? basePath + '/' : '/') + 'patient/setup-profile.html';
+      window.location.href = origin ? origin + setupPath : setupPath;
+      return;
+    }
+
+    // Nếu là Doctor, kiểm tra xem đã có profile chưa
+    if (role === 'Doctor') {
+      try {
+        // Kiểm tra xem đã có doctor profile chưa
+        if (window.AuraAPI && window.AuraAPI.getDoctorByAccount) {
+          const doctor = await window.AuraAPI.getDoctorByAccount(accountId);
+          if (doctor && doctor.doctor_id) {
+            // Đã có profile, redirect đến dashboard
+            redirectByRole();
+            return;
+          }
+        }
+      } catch (err) {
+        // Nếu lỗi (404 hoặc network), giả sử chưa có profile
+        console.log('Chưa có doctor profile hoặc lỗi khi kiểm tra:', err);
+      }
+
+      // Chưa có profile, redirect đến setup-profile.html
+      const origin = window.location.origin || '';
+      const basePath = (window.location.pathname || '').replace(/\/[^/]*$/, '') || '';
+      const setupPath = (basePath ? basePath + '/' : '/') + 'doctor/setup-profile.html';
+      window.location.href = origin ? origin + setupPath : setupPath;
+      return;
+    }
+
+    // Các role khác, redirect bình thường
+    redirectByRole();
+  }
+
   window.AuraAuth = {
     getToken,
     getUser,
@@ -127,5 +196,6 @@
     getRoleNameByRoleId,
     setAuthFromResponse,
     redirectByRole,
+    redirectByRoleWithProfileCheck,
   };
 })();

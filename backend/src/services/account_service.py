@@ -145,8 +145,52 @@ class AccountService:
         return self.repository.update_password(account_id, new_password_hash)
     
     def update_status(self, account_id: int, status: str) -> Optional[Account]:
-        """Update account status"""
-        return self.repository.update_status(account_id, status)
+        """
+        Update account status
+        If account is ClinicManager (role_id=4), also update clinic status accordingly:
+        - When ClinicManager account is suspended/inactive → suspend clinic
+        - When ClinicManager account is active → verify clinic (if clinic was verified before or is suspended)
+        """
+        account = self.repository.get_by_id(account_id)
+        if not account:
+            return None
+        
+        # Check if this is a ClinicManager account with clinic_id
+        is_clinic_manager = getattr(account, 'role_id', None) == 4
+        clinic_id = getattr(account, 'clinic_id', None)
+        
+        # Update account status
+        updated_account = self.repository.update_status(account_id, status)
+        if not updated_account:
+            return None
+        
+        # If ClinicManager account, sync clinic status
+        if is_clinic_manager and clinic_id:
+            try:
+                from infrastructure.repositories.clinic_repository import ClinicRepository
+                from infrastructure.databases.mssql import session
+                
+                clinic_repo = ClinicRepository(session)
+                clinic = clinic_repo.get_by_id(clinic_id)
+                
+                if clinic:
+                    if status in ['suspended', 'inactive']:
+                        # Suspend clinic if ClinicManager is suspended/inactive
+                        # Only suspend if clinic is currently verified
+                        if clinic.verification_status == 'verified':
+                            clinic_repo.suspend_clinic(clinic_id)
+                    elif status == 'active':
+                        # Verify/approve clinic if ClinicManager is active
+                        # Only approve if clinic was verified before or is currently suspended
+                        if clinic.verification_status == 'suspended':
+                            clinic_repo.approve_clinic(clinic_id)  # This sets verification_status to 'verified'
+                        # Note: If clinic is already 'verified', we don't change it
+                        # If clinic is 'pending' or 'rejected', we don't auto-approve (admin must verify manually)
+            except Exception as e:
+                # Log error but don't fail account status update
+                print(f"Warning: Failed to sync clinic status for ClinicManager account {account_id}: {e}")
+        
+        return updated_account
     
     def delete_account(self, account_id: int) -> bool:
         """Delete account"""

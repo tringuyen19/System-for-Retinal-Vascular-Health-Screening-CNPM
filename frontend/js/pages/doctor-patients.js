@@ -105,11 +105,17 @@
     linkCreateReport.setAttribute('href', 'create-report.html?patient_id=' + patientId);
     var modal = bootstrap.Modal.getOrCreateInstance(patientDetailModal);
     modal.show();
-    window.AuraAPI.getPatient(patientId)
-      .then(function (p) {
+    Promise.all([
+      window.AuraAPI.getPatient(patientId),
+      window.AuraAPI.getImagesByPatient(patientId).catch(function () { return { images: [] }; })
+    ])
+      .then(function (arr) {
+        var p = arr[0];
+        var imagesData = arr[1];
+        var images = (imagesData && imagesData.images) || [];
         var dob = (p.date_of_birth) ? new Date(p.date_of_birth).toLocaleDateString('vi-VN') : '-';
         var gender = (p.gender === 'M' || p.gender === 'male') ? 'Nam' : ((p.gender === 'F' || p.gender === 'female') ? 'Nữ' : '-');
-        patientDetailBody.innerHTML =
+        var infoHtml =
           '<table class="table table-sm">' +
           '<tr><th class="text-muted" style="width:140px">ID</th><td>' + (p.patient_id || p.id) + '</td></tr>' +
           '<tr><th class="text-muted">Họ tên</th><td>' + (p.patient_name || p.full_name || '-') + '</td></tr>' +
@@ -118,6 +124,30 @@
           '<tr><th class="text-muted">Mức rủi ro</th><td>' + riskLabel(p.risk_level) + '</td></tr>' +
           '<tr><th class="text-muted">Tiền sử bệnh</th><td>' + (p.medical_history || '-') + '</td></tr>' +
           '</table>';
+        var imagesHtml = '';
+        if (images.length) {
+          imagesHtml = '<div class="mt-3 pt-3 border-top"><h6 class="text-muted mb-2"><i class="bi bi-images me-1"></i>Ảnh bệnh nhân đã tải (' + images.length + ')</h6>' +
+            '<div class="row g-2">';
+          images.forEach(function (img) {
+            var url = (img.image_url || img.full_url || '').trim();
+            var label = (img.image_type || 'fundus') + ' - ' + (img.eye_side || '');
+            var uploadDate = img.upload_time ? (typeof img.upload_time === 'string' ? img.upload_time.slice(0, 10) : img.upload_time) : '';
+            if (!url) return;
+            imagesHtml += '<div class="col-6 col-md-4">' +
+              '<div class="card border shadow-sm">' +
+              '<a href="' + url + '" target="_blank" rel="noopener" class="text-decoration-none">' +
+              '<img src="' + url + '" alt="Ảnh" class="card-img-top" style="height:100px;object-fit:cover;" onerror="this.style.background=\'#eee\';this.alt=\'Không tải được ảnh\';">' +
+              '</a>' +
+              '<div class="card-body py-2 px-2">' +
+              '<div class="small text-muted">' + label + (uploadDate ? ' • ' + uploadDate : '') + '</div>' +
+              '<a href="' + url + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary mt-1">Xem ảnh</a>' +
+              '</div></div></div>';
+          });
+          imagesHtml += '</div></div>';
+        } else {
+          imagesHtml = '<div class="mt-3 pt-3 border-top"><p class="text-muted small mb-0"><i class="bi bi-images me-1"></i>Chưa có ảnh nào được tải lên.</p></div>';
+        }
+        patientDetailBody.innerHTML = infoHtml + imagesHtml;
       })
       .catch(function (err) {
         patientDetailBody.innerHTML = '<p class="text-danger mb-0">' + (err.message || 'Không tải được thông tin.') + '</p>';

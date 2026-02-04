@@ -55,22 +55,45 @@
 
     <main class="flex-grow-1 p-4" style="background-color: #f5f5f5;">
       <div class="container-fluid">
-        <h1 class="h3 mb-4">Xuất thống kê</h1>
+        <h1 class="h3 mb-2">Xuất thống kê</h1>
+        <p class="text-muted mb-4"> Xuất thống kê tổng hợp phục vụ nghiên cứu hoặc quản lý</p>
         <div id="pageError" class="alert alert-danger d-none"></div>
         <div class="card border-0 shadow-sm mb-3">
           <div class="card-body">
-            <p class="mb-2">Chọn định dạng và tải thống kê phòng khám.</p>
-            <div class="d-flex gap-2 align-items-center">
-              <select class="form-select w-auto" id="exportFormat">
-                <option value="json">JSON</option>
-                <option value="csv_data">CSV</option>
-              </select>
-              <button type="button" class="btn btn-primary" id="btnExport"><i class="bi bi-download me-1"></i>Tải xuống</button>
+            <div class="row g-3 mb-3">
+              <div class="col-md-3">
+                <label class="form-label">Từ ngày</label>
+                <input type="date" class="form-control" id="startDate" aria-label="Từ ngày">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">Đến ngày</label>
+                <input type="date" class="form-control" id="endDate" aria-label="Đến ngày">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">Định dạng</label>
+                <select class="form-select" id="exportFormat">
+                  <option value="json">JSON</option>
+                  <option value="csv_data">CSV</option>
+                  <option value="pdf">PDF</option>
+                </select>
+              </div>
+              <div class="col-md-3 d-flex align-items-end">
+                <button type="button" class="btn btn-primary w-100" id="btnExport"><i class="bi bi-download me-1"></i>Tải xuống</button>
+              </div>
             </div>
+            <p class="mb-0 small text-muted">Để trống khoảng thời gian nếu muốn xuất toàn bộ dữ liệu.</p>
           </div>
         </div>
+        <div class="card border-0 shadow-sm mb-3" id="summaryCardsCard" style="display: none;">
+          <div class="card-header bg-transparent border-0 py-2"><strong>Tổng quan</strong></div>
+          <div class="card-body pt-0" id="summaryCards"></div>
+        </div>
         <div class="card border-0 shadow-sm">
-          <div class="card-body" id="previewContent">Bấm "Tải xuống" để xem dữ liệu mẫu hoặc lưu file.</div>
+          <div class="card-header bg-transparent d-flex align-items-center justify-content-between">
+            <span id="previewTitle">Dữ liệu xuất</span>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnToggleRaw" style="display: none;">Thu gọn / Mở rộng</button>
+          </div>
+          <div class="card-body" id="previewContent">Chọn khoảng thời gian (tùy chọn), định dạng và bấm "Tải xuống" để xem tổng quan và tải file.</div>
         </div>
       </div>
     </main>
@@ -78,6 +101,7 @@
 
   <footer class="aura-footer py-3 border-top" style="background-color: #f5f5f5;"><div class="container-fluid"><span class="text-muted small">&copy; 2025 AURA</span></div></footer>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="../js/config.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/auth.js"></script>

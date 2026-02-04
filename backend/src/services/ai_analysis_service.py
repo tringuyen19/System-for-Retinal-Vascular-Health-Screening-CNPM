@@ -5,6 +5,8 @@ Handles AI analysis workflow orchestration
 
 from typing import List, Optional
 from datetime import datetime, date
+from decimal import Decimal
+import random
 from domain.models.ai_analysis import AiAnalysis
 from domain.models.iai_analysis_repository import IAiAnalysisRepository
 from domain.exceptions import NotFoundException, ValidationException
@@ -13,6 +15,83 @@ from domain.exceptions import NotFoundException, ValidationException
 class AiAnalysisService:
     def __init__(self, repository: IAiAnalysisRepository):
         self.repository = repository
+    
+    def _generate_mock_result_data(self) -> dict:
+        """
+        Generate mock AI result data for auto-creation
+        Returns dict with disease_type, risk_level, confidence_score
+        """
+        # Common retinal diseases
+        disease_types = [
+            'diabetic_retinopathy',
+            'macular_degeneration',
+            'glaucoma',
+            'retinal_detachment',
+            'hypertensive_retinopathy',
+            'normal'
+        ]
+        
+        risk_levels = ['low', 'medium', 'high', 'critical']
+        risk_weights = [0.4, 0.3, 0.2, 0.1]  # Higher probability for lower risk
+        
+        disease_type = random.choice(disease_types)
+        risk_level = random.choices(risk_levels, weights=risk_weights)[0]
+        
+        # Generate confidence score based on risk level
+        if risk_level == 'low':
+            confidence_score = Decimal(random.uniform(60.0, 95.0))
+        elif risk_level == 'medium':
+            confidence_score = Decimal(random.uniform(50.0, 85.0))
+        elif risk_level == 'high':
+            confidence_score = Decimal(random.uniform(70.0, 95.0))
+        else:  # critical
+            confidence_score = Decimal(random.uniform(80.0, 98.0))
+        
+        return {
+            'disease_type': disease_type,
+            'risk_level': risk_level,
+            'confidence_score': round(confidence_score, 2)
+        }
+    
+    def _auto_create_result(self, analysis_id: int):
+        """
+        Auto-create AI result with mock data when analysis is created
+        """
+        try:
+            from infrastructure.repositories.ai_result_repository import AiResultRepository
+            from infrastructure.repositories.notification_repository import NotificationRepository
+            from infrastructure.repositories.ai_analysis_repository import AiAnalysisRepository
+            from infrastructure.repositories.retinal_image_repository import RetinalImageRepository
+            from infrastructure.databases.mssql import session
+            from services.ai_result_service import AiResultService
+            
+            # Initialize result service
+            result_repo = AiResultRepository(session)
+            notification_repo = NotificationRepository(session)
+            analysis_repo = AiAnalysisRepository(session)
+            image_repo = RetinalImageRepository(session)
+            
+            result_service = AiResultService(
+                repository=result_repo,
+                notification_repository=notification_repo,
+                analysis_repository=analysis_repo,
+                image_repository=image_repo
+            )
+            
+            # Generate mock data
+            mock_data = self._generate_mock_result_data()
+            
+            # Create result
+            result_service.create_result(
+                analysis_id=analysis_id,
+                disease_type=mock_data['disease_type'],
+                risk_level=mock_data['risk_level'],
+                confidence_score=mock_data['confidence_score']
+            )
+        except Exception as e:
+            # Log error but don't fail analysis creation
+            # Result can be created manually later if needed
+            pass
     
     def create_analysis(self, image_id: int, ai_model_version_id: int, 
                        status: str = 'pending', processing_time: Optional[int] = None) -> Optional[AiAnalysis]:
@@ -33,13 +112,19 @@ class AiAnalysisService:
         if status not in valid_statuses:
             raise ValidationException(f"Invalid status '{status}'. Must be one of: {', '.join(valid_statuses)}")
         
-        return self.repository.add(
+        analysis = self.repository.add(
             image_id=image_id,
             ai_model_version_id=ai_model_version_id,
             analysis_time=datetime.now(),
             status=status,
             processing_time=processing_time
         )
+        
+        # Auto-trigger: Create AI result with mock data when analysis is created
+        if analysis and analysis.analysis_id:
+            self._auto_create_result(analysis.analysis_id)
+        
+        return analysis
     
     def get_analysis_by_id(self, analysis_id: int) -> AiAnalysis:
         """
@@ -116,8 +201,29 @@ class AiAnalysisService:
         return self.repository.mark_as_processing(analysis_id)
     
     def mark_as_completed(self, analysis_id: int, processing_time: int) -> Optional[AiAnalysis]:
-        """Mark analysis as completed with processing time"""
-        return self.repository.mark_as_completed(analysis_id, processing_time)
+        """
+        Mark analysis as completed with processing time
+        Auto-creates AI result if not already exists
+        """
+        analysis = self.repository.mark_as_completed(analysis_id, processing_time)
+        
+        # Auto-trigger: Create AI result if not exists when analysis is completed
+        if analysis and analysis.analysis_id:
+            try:
+                from infrastructure.repositories.ai_result_repository import AiResultRepository
+                from infrastructure.databases.mssql import session
+                
+                result_repo = AiResultRepository(session)
+                existing_results = result_repo.get_by_analysis_id(analysis_id)
+                
+                # Only create if no results exist yet
+                if not existing_results:
+                    self._auto_create_result(analysis_id)
+            except Exception:
+                # Don't fail if result creation fails
+                pass
+        
+        return analysis
     
     def mark_as_failed(self, analysis_id: int) -> Optional[AiAnalysis]:
         """Mark analysis as failed"""

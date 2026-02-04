@@ -4,6 +4,8 @@ from api.middleware.auth_middleware import require_roles, require_role, get_jwt_
 from infrastructure.repositories.ai_annotation_repository import AiAnnotationRepository
 from infrastructure.repositories.doctor_profile_repository import DoctorProfileRepository
 from infrastructure.repositories.ai_analysis_repository import AiAnalysisRepository
+from infrastructure.repositories.retinal_image_repository import RetinalImageRepository
+from infrastructure.repositories.patient_profile_repository import PatientProfileRepository
 from infrastructure.databases.mssql import session
 from services.ai_annotation_service import AiAnnotationService
 from services.ai_analysis_service import AiAnalysisService
@@ -16,6 +18,8 @@ ai_annotation_bp = Blueprint('ai_annotation', __name__, url_prefix='/api/ai-anno
 annotation_repo = AiAnnotationRepository(session)
 analysis_repo = AiAnalysisRepository(session)
 doctor_repo = DoctorProfileRepository(session)
+image_repo = RetinalImageRepository(session)
+patient_repo = PatientProfileRepository(session)
 
 # Initialize SERVICES (Business Logic Layer) ✅
 annotation_service = AiAnnotationService(annotation_repo)
@@ -163,10 +167,19 @@ def get_annotation_by_analysis(analysis_id):
         annotation = annotation_service.get_annotation_by_analysis(analysis_id)
         if not annotation:
             return not_found_response('Annotation not found for this analysis')
-        
+        patient_name = None
+        try:
+            analysis = analysis_service.get_analysis_by_id(analysis_id)
+            image = image_repo.get_by_id(analysis.image_id) if analysis else None
+            if image:
+                patient = patient_repo.get_by_id(image.patient_id)
+                patient_name = patient.patient_name if patient else None
+        except Exception:
+            pass
         schema = AiAnnotationResponseSchema()
-        return success_response(schema.dump(annotation))
-        
+        data = schema.dump(annotation)
+        data['patient_name'] = patient_name
+        return success_response(data)
     except Exception as e:
         return error_response(f'Internal server error: {str(e)}', 500)
 

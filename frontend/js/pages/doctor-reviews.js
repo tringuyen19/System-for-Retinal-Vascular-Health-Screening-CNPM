@@ -97,9 +97,9 @@
         var html = '';
         pendingList.forEach(function (a) {
           var completed = a.completed_at ? new Date(a.completed_at).toLocaleDateString('vi-VN') : '-';
+          var imgId = a.image_id != null ? a.image_id : '';
           html += '<tr data-analysis-id="' + (a.analysis_id || a.id) + '">' +
-            '<td>' + (a.analysis_id || a.id) + '</td>' +
-            '<td>' + (a.image_id != null ? a.image_id : '-') + '</td>' +
+            '<td>' + (imgId ? '<button type="button" class="btn btn-sm btn-outline-primary btn-view-image" data-image-id="' + imgId + '" title="Xem ảnh"><i class="bi bi-image me-1"></i>Xem ảnh</button>' : '-') + '</td>' +
             '<td><span class="badge bg-secondary">Chưa duyệt</span></td>' +
             '<td>' + completed + '</td>' +
             '<td><button type="button" class="btn btn-sm btn-primary btn-review" data-analysis-id="' + (a.analysis_id || a.id) + '">Duyệt</button></td>' +
@@ -108,9 +108,9 @@
         needRevList.forEach(function (r) {
           var dateStr = (r.reviewed_at || r.completed_at) ? new Date(r.reviewed_at || r.completed_at).toLocaleDateString('vi-VN') : '-';
           var badgeClass = validationStatusBadgeClass(r.validation_status);
+          var imgId = r.image_id != null ? r.image_id : '';
           html += '<tr data-analysis-id="' + (r.analysis_id || r.id) + '">' +
-            '<td>' + (r.analysis_id || r.id) + '</td>' +
-            '<td>' + (r.image_id != null ? r.image_id : '-') + '</td>' +
+            '<td>' + (imgId ? '<button type="button" class="btn btn-sm btn-outline-primary btn-view-image" data-image-id="' + imgId + '" title="Xem ảnh"><i class="bi bi-image me-1"></i>Xem ảnh</button>' : '-') + '</td>' +
             '<td><span class="badge bg-' + badgeClass + '">' + validationStatusLabel(r.validation_status) + '</span></td>' +
             '<td>' + dateStr + '</td>' +
             '<td><button type="button" class="btn btn-sm btn-primary btn-review" data-analysis-id="' + (r.analysis_id || r.id) + '">Duyệt</button></td>' +
@@ -121,6 +121,33 @@
           btn.addEventListener('click', function () {
             var id = btn.getAttribute('data-analysis-id');
             if (id) openReviewModal(parseInt(id, 10));
+          });
+        });
+        if (pendingBody) pendingBody.querySelectorAll('.btn-view-image').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var imageId = btn.getAttribute('data-image-id');
+            if (!imageId || !window.AuraAPI || !window.AuraAPI.getRetinalImage) return;
+            var label = btn.textContent;
+            btn.disabled = true;
+            if (btn.innerHTML) btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang tải...';
+            window.AuraAPI.getRetinalImage(parseInt(imageId, 10))
+              .then(function (img) {
+                var url = (img && (img.image_url || img.full_url)) || (img && img.data && (img.data.image_url || img.data.full_url));
+                if (url) {
+                  window.open(url, '_blank', 'noopener,noreferrer');
+                } else {
+                  if (window.AuraAlert && window.AuraAlert.toast) window.AuraAlert.toast('Không có URL ảnh.', 'warning');
+                  else alert('Không có URL ảnh.');
+                }
+              })
+              .catch(function (err) {
+                if (window.AuraAlert && window.AuraAlert.toast) window.AuraAlert.toast(err.message || 'Không tải được ảnh.', 'danger');
+                else alert(err.message || 'Không tải được ảnh.');
+              })
+              .finally(function () {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-image me-1"></i>Xem ảnh';
+              });
           });
         });
       })

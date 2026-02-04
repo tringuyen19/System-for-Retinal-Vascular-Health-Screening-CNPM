@@ -957,29 +957,41 @@ class ClinicService:
     
     # ========== FR-30: Export Statistics for Research ==========
     
-    def export_clinic_statistics(self, clinic_id: int, format: str = 'json') -> Dict[str, Any]:
+    def export_clinic_statistics(self, clinic_id: int, format: str = 'json',
+                                 start_date: Optional[date] = None,
+                                 end_date: Optional[date] = None) -> Dict[str, Any]:
         """
         Export clinic statistics for clinical research or management (FR-30)
         
         Args:
             clinic_id: Clinic ID
             format: Export format ('json', 'csv_data')
+            start_date: Optional filter analyses/reports from this date
+            end_date: Optional filter analyses/reports until this date
             
         Returns:
             dict: Exported statistics data
         """
-        # Gather all statistics
-        risk_data = self.get_clinic_risk_aggregation(clinic_id)
+        clinic = self.get_clinic_by_id(clinic_id)
+        clinic_name = clinic.name if clinic else f"Phòng khám #{clinic_id}"
+
+        # Gather all statistics (risk and reports filtered by date range)
+        risk_data = self.get_clinic_risk_aggregation(clinic_id, start_date=start_date, end_date=end_date)
         usage_data = self.get_clinic_usage_summary(clinic_id)
-        reports_data = self.get_clinic_reports_summary(clinic_id)
+        reports_data = self.get_clinic_reports_summary(clinic_id, start_date=start_date, end_date=end_date)
         members_data = self.get_clinic_members(clinic_id)
         trends_data = self.detect_abnormal_trends(clinic_id, days=90)
         
         # Compile comprehensive statistics
         statistics = {
             'clinic_id': clinic_id,
+            'clinic_name': clinic_name,
             'export_date': datetime.now().isoformat(),
             'export_format': format,
+            'date_range': {
+                'start_date': start_date.isoformat() if start_date else None,
+                'end_date': end_date.isoformat() if end_date else None
+            },
             'clinic_info': {
                 'total_doctors': members_data.get('total_doctors', 0),
                 'total_patients': members_data.get('total_patients', 0)
@@ -1024,6 +1036,7 @@ class ClinicService:
         
         # Clinic info
         csv_rows.append(['Clinic ID', str(statistics['clinic_id'])])
+        csv_rows.append(['Clinic Name', statistics.get('clinic_name', '')])
         csv_rows.append(['Total Doctors', str(statistics['clinic_info']['total_doctors'])])
         csv_rows.append(['Total Patients', str(statistics['clinic_info']['total_patients'])])
         csv_rows.append(['', ''])  # Empty row

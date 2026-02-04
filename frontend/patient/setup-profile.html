@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thiết lập hồ sơ | Bệnh nhân | AURA</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="../css/style.css" rel="stylesheet">
+</head>
+<body class="d-flex flex-column min-vh-100">
+  <header class="aura-header navbar navbar-expand-lg navbar-dark" style="background-color: #212121;">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="../index.html">AURA</a>
+    </div>
+  </header>
+  <main class="flex-grow-1 d-flex align-items-center justify-content-center p-4" style="background-color: #f5f5f5; padding-top: 80px !important;">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+          <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+              <div class="text-center mb-4">
+                <i class="bi bi-person-plus-fill text-primary" style="font-size: 3rem;"></i>
+                <h2 class="h4 mt-3 mb-2">Thiết lập hồ sơ bệnh nhân</h2>
+                <p class="text-muted small">Vui lòng điền thông tin để hoàn tất đăng ký và sử dụng dịch vụ</p>
+              </div>
+              <div id="setupError" class="alert alert-danger d-none"></div>
+              <form id="setupForm">
+                <div class="mb-3">
+                  <label class="form-label">Họ tên <span class="text-danger">*</span></label>
+                  <input type="text" class="form-control" id="patientName" name="patient_name" required placeholder="VD: Nguyễn Văn A">
+                  <div class="invalid-feedback"></div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Ngày sinh</label>
+                  <input type="date" class="form-control" id="dateOfBirth" name="date_of_birth">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Giới tính</label>
+                  <select class="form-select" id="gender" name="gender">
+                    <option value="">-- Chọn --</option>
+                    <option value="male">Nam</option>
+                    <option value="female">Nữ</option>
+                    <option value="other">Khác</option>
+                  </select>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Phòng khám <span class="text-danger">*</span></label>
+                  <select class="form-select" id="clinicId" name="clinic_id" required>
+                    <option value="">-- Đang tải danh sách phòng khám --</option>
+                  </select>
+                  <div class="form-text">Vui lòng chọn phòng khám bạn muốn sử dụng dịch vụ</div>
+                  <div class="invalid-feedback"></div>
+                </div>
+                <div class="mb-4">
+                  <label class="form-label">Tiền sử bệnh (ghi chú)</label>
+                  <textarea class="form-control" id="medicalHistory" name="medical_history" rows="3" placeholder="Tùy chọn - Ghi chú về tiền sử bệnh nếu có"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary w-100" id="btnSubmit">
+                  <i class="bi bi-check-circle me-2"></i>Hoàn tất thiết lập
+                </button>
+              </form>
+            </div>
+          </div>
+          <div class="text-center mt-3">
+            <p class="text-muted small">Bạn có thể cập nhật thông tin này sau tại trang Hồ sơ</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <footer class="aura-footer py-3 border-top" style="background-color: #f5f5f5;">
+    <div class="container-fluid">
+      <span class="text-muted small">&copy; 2025 AURA</span>
+    </div>
+  </footer>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/components/alert.js"></script>
+  <script src="../js/pages/patient-setup-profile.js"></script>
+</body>
+</html>

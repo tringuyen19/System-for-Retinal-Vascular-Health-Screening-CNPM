@@ -6,6 +6,7 @@ from infrastructure.repositories.doctor_profile_repository import DoctorProfileR
 from infrastructure.repositories.ai_analysis_repository import AiAnalysisRepository
 from infrastructure.repositories.notification_repository import NotificationRepository
 from infrastructure.repositories.retinal_image_repository import RetinalImageRepository
+from infrastructure.repositories.patient_profile_repository import PatientProfileRepository
 from infrastructure.databases.mssql import session
 from services.ai_result_service import AiResultService
 from services.ai_analysis_service import AiAnalysisService
@@ -20,6 +21,7 @@ analysis_repo = AiAnalysisRepository(session)
 notification_repo = NotificationRepository(session)
 image_repo = RetinalImageRepository(session)
 doctor_repo = DoctorProfileRepository(session)
+patient_repo = PatientProfileRepository(session)
 
 # Initialize SERVICES with dependency injection ✅
 result_service = AiResultService(
@@ -217,15 +219,22 @@ def get_results_by_analysis(analysis_id):
     """
     try:
         results = result_service.get_results_by_analysis(analysis_id)
-        
-        # Serialize response with schema
+        patient_name = None
+        try:
+            analysis = analysis_service.get_analysis_by_id(analysis_id)
+            image = image_repo.get_by_id(analysis.image_id) if analysis else None
+            if image:
+                patient = patient_repo.get_by_id(image.patient_id)
+                patient_name = patient.patient_name if patient else None
+        except Exception:
+            pass
         schema = AiResultResponseSchema(many=True)
         return success_response({
             'analysis_id': analysis_id,
             'count': len(results),
+            'patient_name': patient_name,
             'results': schema.dump(results)
         })
-        
     except Exception as e:
         return error_response(f'Internal server error: {str(e)}', 500)
 

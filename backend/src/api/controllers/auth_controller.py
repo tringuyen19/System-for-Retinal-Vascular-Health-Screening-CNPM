@@ -2,7 +2,7 @@
 Authentication Controller - Login and Registration
 """
 
-from flask import Blueprint, request
+from flask import Blueprint, request, redirect
 from flask_jwt_extended import create_access_token, verify_jwt_in_request
 from marshmallow import ValidationError
 
@@ -16,6 +16,19 @@ from services.clinic_service import ClinicService
 from api.responses import success_response, error_response, validation_error_response
 from api.schemas import LoginRequestSchema, RegisterRequestSchema, AuthResponseSchema, AccountResponseSchema
 from domain.exceptions import NotFoundException, ValidationException, ConflictException
+from config import Config
+from urllib.parse import urlencode, quote
+import os
+
+# Google OAuth dependencies (FR-1)
+try:
+    import requests as http_requests
+    from google.oauth2 import id_token as google_id_token
+    from google.auth.transport import requests as google_requests
+except Exception:  # pragma: no cover - optional at runtime
+    http_requests = None
+    google_id_token = None
+    google_requests = None
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
@@ -355,3 +368,122 @@ def get_current_user_info():
         print(f"JWT Verification Error: {str(e)}")
         print(traceback.format_exc())
         return error_response(f'Authentication required. Please provide a valid token. Error: {str(e)}', 401)
+
+
+# ========== FR-1: Google OAuth Login ==========
+
+@auth_bp.route('/google/login', methods=['GET'])
+def google_login():
+    """
+    Start Google OAuth2 login flow (FR-1).
+    Redirects user to Google's consent screen.
+    """
+    client_id = Config.GOOGLE_CLIENT_ID
+    redirect_uri = Config.GOOGLE_REDIRECT_URI
+    if not client_id or not redirect_uri:
+        return error_response('Google OAuth chưa được cấu hình. Vui lòng thiết lập GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET/GOOGLE_REDIRECT_URI.', 501)
+
+    params = {
+        'client_id': client_id,
+        'redirect_uri': redirect_uri,
+        'response_type': 'code',
+        'scope': 'openid email profile',
+        'access_type': 'offline',
+        'include_granted_scopes': 'true',
+        'prompt': 'select_account',
+    }
+    url = 'https://accounts.google.com/o/oauth2/v2/auth?' + urlencode(params)
+    return redirect(url)
+
+
+@auth_bp.route('/google/callback', methods=['GET'])
+def google_callback():
+    """
+    Google OAuth2 callback (FR-1).
+    - Nhận mã `code` từ Google
+    - Đổi sang id_token, xác thực email
+    - Tìm hoặc tạo account (role mặc định: Patient)
+    - Sinh JWT giống login thường và redirect về frontend với ?google_token=
+    """
+    if http_requests is None or google_id_token is None or google_requests is None:
+        return error_response('Máy chủ chưa cài đặt thư viện google-auth/requests.', 501)
+
+    code = request.args.get('code')
+    if not code:
+        return error_response('Thiếu mã xác thực từ Google.', 400)
+
+    client_id = Config.GOOGLE_CLIENT_ID
+    client_secret = Config.GOOGLE_CLIENT_SECRET
+    redirect_uri = Config.GOOGLE_REDIRECT_URI
+    if not client_id or not client_secret or not redirect_uri:
+        return error_response('Google OAuth chưa được cấu hình đầy đủ.', 501)
+
+    try:
+        # 1. Đổi code lấy token từ Google
+        token_resp = http_requests.post(
+            'https://oauth2.googleapis.com/token',
+            data={
+                'code': code,
+                'client_id': client_id,
+                'client_secret': client_secret,
+                'redirect_uri': redirect_uri,
+                'grant_type': 'authorization_code',
+            },
+            timeout=10,
+        )
+        token_resp.raise_for_status()
+        token_data = token_resp.json()
+        id_token_str = token_data.get('id_token')
+        if not id_token_str:
+            return error_response('Không nhận được id_token từ Google.', 400)
+
+        # 2. Verify id_token
+        idinfo = google_id_token.verify_oauth2_token(
+            id_token_str,
+            google_requests.Request(),
+            client_id,
+        )
+        email = idinfo.get('email')
+        email_verified = idinfo.get('email_verified')
+        if not email or not email_verified:
+            return error_response('Email Google chưa được xác minh.', 400)
+
+        # 3. Tìm hoặc tạo account cho email này
+        try:
+            account = account_service.get_account_by_email(email)
+        except NotFoundException:
+            # Tạo account mới: mặc định Patient (role_id=3)
+            # Mật khẩu random chỉ dùng nội bộ (user đăng nhập bằng Google)
+            import secrets
+            random_password = secrets.token_urlsafe(16)
+            account = account_service.create_account(
+                email=email,
+                password=random_password,
+                role_id=3,       # Patient
+                clinic_id=None,
+                status='active',
+            )
+
+        # 4. Sinh JWT như flow login/register
+        additional_claims = {
+            'role_id': account.role_id,
+            'email': account.email,
+            'clinic_id': account.clinic_id,
+        }
+        access_token = create_access_token(
+            identity=str(account.account_id),
+            additional_claims=additional_claims,
+        )
+
+        # 5. Redirect về frontend với ?google_token=
+        frontend_base = Config.FRONTEND_BASE_URL.rstrip('/')
+        # Dùng login.html làm điểm vào chung
+        redirect_url = f"{frontend_base}/login.html?google_token={quote(access_token)}"
+        return redirect(redirect_url)
+
+    except Exception as e:
+        # In log cho debug, nhưng trả về message gọn
+        import traceback
+        print("Google OAuth error:", e)
+        print(traceback.format_exc())
+        return error_response('Đăng nhập Google thất bại. Vui lòng thử lại.', 400)

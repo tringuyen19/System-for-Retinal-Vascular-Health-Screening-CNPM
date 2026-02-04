@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
-from api.middleware.auth_middleware import require_role, require_roles
+from api.middleware.auth_middleware import require_role, require_roles, get_jwt, get_current_user_role_name
 from infrastructure.repositories.clinic_repository import ClinicRepository
 from infrastructure.repositories.account_repository import AccountRepository
 from infrastructure.repositories.patient_profile_repository import PatientProfileRepository
@@ -1602,6 +1602,20 @@ def export_clinic_statistics(clinic_id):
           enum: [json, csv_data]
           default: json
         description: Export format (json or csv_data)
+      - name: start_date
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+        description: Filter data from this date (YYYY-MM-DD)
+      - name: end_date
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+        description: Filter data until this date (YYYY-MM-DD)
     responses:
       200:
         description: Statistics exported
@@ -1725,12 +1739,40 @@ def export_clinic_statistics(clinic_id):
         description: Internal server error
     """
     try:
+        from datetime import date as date_type
+
+        # Authorization: ClinicManager can only export their own clinic
+        role_name = get_current_user_role_name()
+        if role_name == 'ClinicManager':
+            claims = get_jwt()
+            user_clinic_id = claims.get('clinic_id')
+            if user_clinic_id is None or int(user_clinic_id) != int(clinic_id):
+                return error_response('Bạn chỉ được xuất thống kê của phòng khám mình quản lý.', 403)
+
         export_format = request.args.get('format', 'json')
-        
         if export_format not in ['json', 'csv_data']:
             return error_response('Invalid format. Must be "json" or "csv_data"', 400)
-        
-        statistics = clinic_service.export_clinic_statistics(clinic_id, format=export_format)
+
+        start_date = None
+        end_date = None
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+        if start_date_str:
+            try:
+                start_date = date_type.fromisoformat(start_date_str)
+            except ValueError:
+                return error_response('Invalid start_date format. Use YYYY-MM-DD', 400)
+        if end_date_str:
+            try:
+                end_date = date_type.fromisoformat(end_date_str)
+            except ValueError:
+                return error_response('Invalid end_date format. Use YYYY-MM-DD', 400)
+        if start_date and end_date and start_date > end_date:
+            return error_response('start_date must be before or equal to end_date', 400)
+
+        statistics = clinic_service.export_clinic_statistics(
+            clinic_id, format=export_format, start_date=start_date, end_date=end_date
+        )
         return success_response(statistics)
     except ValueError as e:
         return error_response(str(e), 400)

@@ -23,6 +23,11 @@
     pageError.classList.toggle('d-none', !msg);
   }
 
+  function esc(s) {
+    if (s == null || s === '') return '';
+    return ('' + s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
   function load() {
     if (!clinicId) { showError('Bạn chưa được gán phòng khám.'); return; }
     showError('');
@@ -43,9 +48,20 @@
         var html = '';
         list.forEach(function (img) {
           var created = (img.upload_time || img.created_at) ? new Date(img.upload_time || img.created_at).toLocaleDateString('vi-VN') : '-';
-          html += '<tr><td>' + (img.image_id || img.id || '-') + '</td><td>' + (img.patient_id || '-') + '</td><td>' + (img.image_type || '-') + '</td><td>' + (img.eye_side || '-') + '</td><td><span class="badge bg-secondary">' + (img.status || '-') + '</span></td><td>' + created + '</td></tr>';
+          var url = (img.image_url || img.full_url || '').trim();
+          var imgCell = url
+            ? '<img src="' + url + '" alt="" class="rounded" style="width:48px;height:48px;object-fit:cover;" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'inline-block\';"><span class="d-none"><i class="bi bi-image text-muted"></i></span><br><button type="button" class="btn btn-sm btn-outline-primary mt-1 btn-view-image" data-url="' + url.replace(/"/g, '&quot;') + '"><i class="bi bi-image me-1"></i>Xem ảnh</button>'
+            : '<button type="button" class="btn btn-sm btn-outline-secondary btn-view-image" disabled><i class="bi bi-image me-1"></i>Không có ảnh</button>';
+          var patientDisplay = (img.patient_name || '').trim() || (img.patient_id != null ? img.patient_id : '-');
+        html += '<tr><td>' + (img.image_id || img.id || '-') + '</td><td>' + imgCell + '</td><td>' + esc(patientDisplay) + '</td><td>' + esc(img.image_type || '-') + '</td><td>' + esc(img.eye_side || '-') + '</td><td><span class="badge bg-secondary">' + esc(img.status || '-') + '</span></td><td>' + created + '</td></tr>';
         });
         tbody.innerHTML = html;
+        tbody.querySelectorAll('.btn-view-image:not([disabled])').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var u = btn.getAttribute('data-url');
+            if (u) window.open(u, '_blank', 'noopener,noreferrer');
+          });
+        });
       })
       .catch(function (err) {
         loading.classList.add('d-none');

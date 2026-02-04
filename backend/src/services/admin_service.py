@@ -111,12 +111,41 @@ class AdminService:
         def _norm(s: Any) -> str:
             return str(s).strip().lower() if s is not None else ''
 
-        # IMPORTANT (FR-35/FR-31): Total users = total patient_profiles + total doctor_profiles
-        # (not total accounts), so it updates correctly when profiles are created/deleted.
-        patient_profiles = self.patient_repository.get_all() if self.patient_repository else []
-        doctor_profiles = self.doctor_repository.get_all() if self.doctor_repository else []
-        patients_count = len(patient_profiles)
-        doctors_count = len(doctor_profiles)
+        # IMPORTANT: Total users = total patient_profiles + total doctor_profiles
+        # BUT only count those with account status='active' (exclude inactive/suspended)
+        # Total clinics = distinct clinic_id from accounts with status='active'
+        
+        # Get all active accounts first
+        active_accounts = []
+        if self.account_repository:
+            try:
+                active_accounts = self.account_repository.get_by_status('active')
+            except Exception as e:
+                print(f"Error getting active accounts: {e}")
+                active_accounts = []
+        
+        active_account_ids = {acc.account_id for acc in active_accounts}
+        
+        # Count patients with active accounts
+        patients_count = 0
+        if self.patient_repository:
+            try:
+                all_patients = self.patient_repository.get_all()
+                patients_count = sum(1 for p in all_patients if p.account_id in active_account_ids)
+            except Exception as e:
+                print(f"Error counting active patients: {e}")
+                patients_count = 0
+        
+        # Count doctors with active accounts
+        doctors_count = 0
+        if self.doctor_repository:
+            try:
+                all_doctors = self.doctor_repository.get_all()
+                doctors_count = sum(1 for d in all_doctors if d.account_id in active_account_ids)
+            except Exception as e:
+                print(f"Error counting active doctors: {e}")
+                doctors_count = 0
+        
         users_count = patients_count + doctors_count
 
         # Optional: include total accounts for broader "user" definition (admin/clinic_manager)
@@ -125,7 +154,22 @@ class AdminService:
         except Exception:
             total_accounts = None
 
-        clinics_count = len(self.clinic_repository.get_all())
+        # Count clinics: distinct clinic_id from ClinicManager accounts (role_id=4) with status='active'
+        # A clinic is "active" if it has at least one ClinicManager account with status='active'
+        clinics_count = 0
+        if active_accounts:
+            try:
+                # Filter to only ClinicManager accounts (role_id=4) with active status
+                clinic_manager_accounts = [acc for acc in active_accounts if getattr(acc, 'role_id', None) == 4]
+                clinic_ids = {acc.clinic_id for acc in clinic_manager_accounts if acc.clinic_id is not None}
+                clinics_count = len(clinic_ids)
+            except Exception as e:
+                print(f"Error counting active clinics: {e}")
+                # Fallback: count all clinics
+                clinics_count = len(self.clinic_repository.get_all()) if self.clinic_repository else 0
+        else:
+            # No active accounts, so no active clinics
+            clinics_count = 0
 
         # Usage: images
         all_images = self.image_repository.get_all()

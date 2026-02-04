@@ -11,36 +11,8 @@
   const passwordInput = document.getElementById('regPassword');
   const confirmInput = document.getElementById('regConfirmPassword');
   const roleSelect = document.getElementById('regRole');
-  const wrapClinic = document.getElementById('wrapRegClinic');
-  const clinicSelect = document.getElementById('regClinic');
   const btnSubmit = document.getElementById('btnRegisterSubmit');
   const registerErrorEl = document.getElementById('registerError');
-
-  function toggleClinicByRole() {
-    if (!wrapClinic) return;
-    const roleId = roleSelect ? String(roleSelect.value || '') : '';
-    const show = roleId === '2' || roleId === '3'; // Doctor or Patient
-    wrapClinic.classList.toggle('d-none', !show);
-    if (!show && clinicSelect) clinicSelect.value = '';
-  }
-
-  async function loadClinics() {
-    if (!clinicSelect || !window.AuraAPI || !window.AuraAPI.listClinics) return;
-    try {
-      const res = await window.AuraAPI.listClinics('verified');
-      const list = (res && res.clinics) ? res.clinics : [];
-      let opts = '<option value="">-- Chọn phòng khám --</option>';
-      list.forEach(function (c) {
-        const id = c.clinic_id != null ? c.clinic_id : c.id;
-        const name = c.name || c.clinic_name || ('Clinic #' + id);
-        opts += '<option value="' + id + '">' + name + '</option>';
-      });
-      clinicSelect.innerHTML = opts;
-    } catch (e) {
-      // Nếu lỗi tải clinics thì chỉ ẩn phần chọn clinic, không chặn đăng ký
-      if (wrapClinic) wrapClinic.classList.add('d-none');
-    }
-  }
 
   function showError(msg) {
     if (!registerErrorEl) return;
@@ -118,13 +90,17 @@
         password: passwordInput.value,
         role_id: parseInt(roleSelect.value, 10),
       };
-      if (clinicSelect && clinicSelect.value) payload.clinic_id = parseInt(clinicSelect.value, 10);
       const res = await window.AuraAPI.register(payload);
       if (window.AuraAuth && window.AuraAuth.setAuthFromResponse(res)) {
         if (window.AuraUtils && window.AuraUtils.showToast) {
           window.AuraUtils.showToast('Đăng ký thành công.', 'success');
         }
-        window.AuraAuth.redirectByRole();
+        // Sử dụng redirectByRoleWithProfileCheck để kiểm tra profile
+        if (window.AuraAuth.redirectByRoleWithProfileCheck) {
+          window.AuraAuth.redirectByRoleWithProfileCheck();
+        } else {
+          window.AuraAuth.redirectByRole();
+        }
         return;
       }
       showError('Phản hồi từ server không hợp lệ.');
@@ -138,8 +114,4 @@
       setLoading(false);
     }
   });
-
-  if (roleSelect) roleSelect.addEventListener('change', toggleClinicByRole);
-  toggleClinicByRole();
-  loadClinics();
 })();

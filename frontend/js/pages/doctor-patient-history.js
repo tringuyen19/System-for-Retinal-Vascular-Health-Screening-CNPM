@@ -29,6 +29,7 @@
   var offset = 0;
   var loadingHistory = false;
   var loadedAll = false;
+  var imageIdToUrl = {};
 
   function showError(msg) {
     if (!pageError) return;
@@ -193,7 +194,7 @@
         '<td class="text-muted small">Đang tải...</td>' +
         '<td>-</td>' +
         '<td>-</td>' +
-        '<td>' + (a.image_id != null ? ('#' + a.image_id) : '-') + '</td>' +
+        '<td>' + (a.image_id != null ? (function () { var u = imageIdToUrl[a.image_id] || ''; return u ? '<a href="' + u + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary"><i class="bi bi-image me-1"></i>Xem ảnh</a>' : ('#' + a.image_id); }()) : '-') + '</td>' +
         '<td><a class="btn btn-sm btn-outline-secondary" href="analysis-results.html"><i class="bi bi-box-arrow-up-right me-1"></i>Xem</a></td>' +
         '</tr>';
     });
@@ -267,10 +268,16 @@
       btnLoadMore.addEventListener('click', function () { loadHistoryPage(); });
     }
 
-    Promise.all([loadPatientInfo(), loadTrend()])
-      .catch(function (err) { showError(err.message || 'Không tải được dữ liệu bệnh nhân.'); });
+    var loadPatientImages = window.AuraAPI.getImagesByPatient(patientId).then(function (data) {
+      imageIdToUrl = {};
+      (data.images || []).forEach(function (img) {
+        imageIdToUrl[img.image_id] = (img.image_url || img.full_url || '').trim();
+      });
+    }).catch(function () { imageIdToUrl = {}; });
 
-    loadHistoryPage();
+    Promise.all([loadPatientInfo(), loadTrend(), loadPatientImages])
+      .catch(function (err) { showError(err.message || 'Không tải được dữ liệu bệnh nhân.'); })
+      .finally(function () { loadHistoryPage(); });
   }
 
   if (document.readyState === 'loading') {

@@ -72,20 +72,21 @@
     pendingList.innerHTML = html;
   }
 
-  function renderAnalysisResults(analyses) {
+  /** Render danh sách kết quả AI theo result_id của các bệnh nhân thuộc doctor (GET /api/ai-results). */
+  function renderAnalysisResults(resultsPayload) {
     if (!analysisResultsList) return;
-    var list = (analyses && analyses.analyses) || analyses || [];
+    var list = (resultsPayload && resultsPayload.results && Array.isArray(resultsPayload.results)) ? resultsPayload.results : [];
     if (!list.length) {
-      analysisResultsList.innerHTML = '<p class="text-muted mb-0">Chưa có kết quả phân tích nào. Xem chi tiết tại <a href="analysis-results.html">Kết quả & chú thích AI</a>.</p>';
+      analysisResultsList.innerHTML = '<p class="text-muted mb-0">Chưa có kết quả phân tích nào của bệnh nhân bạn. Xem chi tiết tại <a href="analysis-results.html">Kết quả & chú thích AI</a>.</p>';
       return;
     }
     var html = '<ul class="list-group list-group-flush">';
-    list.slice(0, 5).forEach(function (a) {
-      var aid = a.analysis_id || a.id;
-      var dateStr = a.analysis_time ? new Date(a.analysis_time).toLocaleDateString('vi-VN') : '-';
+    list.slice(0, 5).forEach(function (r) {
+      var analysisId = r.analysis_id;
+      var patientName = (r.patient_name || '').trim() || 'Bệnh nhân';
       html += '<li class="list-group-item d-flex justify-content-between align-items-center">' +
-        '<span>Phân tích ' + aid + ' - ' + dateStr + '</span>' +
-        '<a href="analysis-results.html" class="btn btn-sm btn-outline-primary">Xem kết quả & chú thích</a></li>';
+        '<span><strong>' + patientName + '</strong></span>' +
+        '<a href="analysis-results.html?analysis_id=' + (analysisId || '') + '" class="btn btn-sm btn-outline-primary">Xem kết quả & chú thích</a></li>';
     });
     html += '</ul>';
     analysisResultsList.innerHTML = html;
@@ -119,32 +120,29 @@
     window.AuraAPI.getDoctorByAccount(accountId)
       .then(function (doctor) {
         if (!doctor || !doctor.doctor_id) {
-          showError('Bạn chưa có hồ sơ bác sĩ. Vui lòng cập nhật <a href="profile.html">Hồ sơ</a>.');
-          setStat(statPatients, 0);
-          setStat(statReviews, 0);
-          setStat(statReports, 0);
-          renderAnalysisResults([]);
-          return null;
+          // Chưa có profile, redirect đến trang setup
+          window.location.href = 'setup-profile.html';
+          return;
         }
         doctorId = doctor.doctor_id;
         return Promise.all([
           window.AuraAPI.getDoctorPerformance(doctorId),
           window.AuraAPI.getReportsByDoctor(doctorId),
-          window.AuraAPI.getCompletedAnalyses()
+          window.AuraAPI.getAllResults()
         ]);
       })
       .then(function (results) {
         if (!results) return;
         var perf = results[0];
         var reportsData = results[1];
-        var completedData = results[2];
+        var resultsPayload = results[2];
 
         setStat(statPatients, (perf && perf.unique_patients != null) ? perf.unique_patients : '-');
         // Chỉ tính "Đã duyệt" khi validation_status = approved
         setStat(statReviews, (perf && perf.approved_reviews != null) ? perf.approved_reviews : '-');
         var reports = (reportsData && reportsData.reports) || [];
         setStat(statReports, (reportsData && reportsData.count != null) ? reportsData.count : reports.length);
-        renderAnalysisResults(completedData);
+        renderAnalysisResults(resultsPayload);
       })
       .catch(function (err) {
         showError(err.message || 'Tải dữ liệu thất bại.');

@@ -493,10 +493,14 @@
     return res.data;
   }
 
-  /** Clinic: xuất thống kê (GET /api/clinics/:id/export-statistics) */
-  async function exportClinicStatistics(clinicId, format) {
-    let path = '/api/clinics/' + clinicId + '/export-statistics';
-    if (format) path += '?format=' + encodeURIComponent(format);
+  /** Clinic: xuất thống kê (GET /api/clinics/:id/export-statistics) - FR-30 */
+  async function exportClinicStatistics(clinicId, format, options) {
+    const params = new URLSearchParams();
+    if (format) params.set('format', format);
+    if (options && options.start_date) params.set('start_date', options.start_date);
+    if (options && options.end_date) params.set('end_date', options.end_date);
+    const qs = params.toString();
+    const path = '/api/clinics/' + clinicId + '/export-statistics' + (qs ? '?' + qs : '');
     const res = await request('GET', path);
     return res.data;
   }
@@ -747,6 +751,12 @@
   /** Admin: phòng khám chờ duyệt (GET /api/clinics/pending) */
   async function getPendingClinics() {
     const res = await request('GET', '/api/clinics/pending');
+    return res.data;
+  }
+
+  /** Public: danh sách phòng khám đã được duyệt (GET /api/clinics/verified) */
+  async function getVerifiedClinics() {
+    const res = await request('GET', '/api/clinics/verified', null, false);
     return res.data;
   }
 
@@ -1035,6 +1045,7 @@
     registerClinic,
     listClinics,
     getPendingClinics,
+    getVerifiedClinics,
     verifyClinic,
     rejectClinic,
     approveClinic,

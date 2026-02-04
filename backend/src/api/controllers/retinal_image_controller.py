@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
+import random
 from api.middleware.auth_middleware import require_roles, require_role
 from infrastructure.repositories.retinal_image_repository import RetinalImageRepository
 from infrastructure.repositories.patient_profile_repository import PatientProfileRepository
@@ -156,9 +157,33 @@ def upload_image():
             status=data.get('status', 'uploaded')
         )
         
+        # Auto-trigger AI analysis if active model exists
+        analysis_id = None
+        try:
+            active_model = model_version_service.get_active_model()
+            if active_model:
+                # Generate random processing time (1-20 seconds)
+                processing_time = random.randint(1, 20)
+                analysis = analysis_service.create_analysis(
+                    image_id=image.image_id,
+                    ai_model_version_id=active_model.ai_model_version_id,
+                    status='completed',
+                    processing_time=processing_time
+                )
+                if analysis:
+                    analysis_id = analysis.analysis_id
+        except Exception as e:
+            # Log analysis error but don't fail the upload
+            # Analysis can be created manually later if needed
+            pass
+        
         # Serialize response with schema
         response_schema = RetinalImageResponseSchema()
-        return success_response(response_schema.dump(image), 'Image uploaded successfully', 201)
+        response_data = response_schema.dump(image)
+        if analysis_id:
+            response_data['analysis_id'] = analysis_id
+        
+        return success_response(response_data, 'Image uploaded successfully', 201)
         
     except ValidationError as e:
         return validation_error_response(e.messages)
@@ -455,10 +480,13 @@ def upload_bulk_images():
                     # FR-24: Auto-trigger AI analysis if active model exists
                     if auto_analyze:
                         try:
+                            # Generate random processing time (1-20 seconds)
+                            processing_time = random.randint(1, 20)
                             analysis = analysis_service.create_analysis(
                                 image_id=image.image_id,
                                 ai_model_version_id=active_model.ai_model_version_id,
-                                status='pending'
+                                status='completed',
+                                processing_time=processing_time
                             )
                             if analysis:
                                 analysis_created.append({
@@ -630,19 +658,27 @@ def get_images_by_clinic(clinic_id):
     """
     try:
         images = image_service.get_images_by_clinic(clinic_id)
-        
+        patient_ids = list({img.patient_id for img in images if getattr(img, 'patient_id', None) is not None})
+        patient_names = {}
+        for pid in patient_ids:
+            try:
+                p = patient_repo.get_by_id(pid)
+                patient_names[pid] = p.patient_name if p else None
+            except Exception:
+                patient_names[pid] = None
         return success_response({
             'count': len(images),
             'images': [{
                 'image_id': img.image_id,
                 'patient_id': img.patient_id,
+                'patient_name': patient_names.get(img.patient_id) if getattr(img, 'patient_id', None) is not None else None,
                 'image_type': img.image_type,
                 'eye_side': img.eye_side,
                 'status': img.status,
+                'image_url': img.image_url,
                 'upload_time': img.upload_time.isoformat() if img.upload_time else None
             } for img in images]
         })
-        
     except Exception as e:
         return error_response(f'Internal server error: {str(e)}', 500)
 

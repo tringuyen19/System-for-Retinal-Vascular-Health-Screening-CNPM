@@ -27,16 +27,33 @@
     if (el) el.textContent = value != null ? value : '-';
   }
 
+  /** Định dạng thời gian: hh:mm yy-mm-dd */
+  function formatDateTime(str) {
+    if (!str) return '-';
+    var d = new Date(str);
+    if (isNaN(d.getTime())) return str;
+    var h = d.getHours();
+    var m = d.getMinutes();
+    var yy = String(d.getFullYear()).slice(-2);
+    var mm = String(d.getMonth() + 1).padStart(2, '0');
+    var dd = String(d.getDate()).padStart(2, '0');
+    var hh = String(h).padStart(2, '0');
+    var min = String(m).padStart(2, '0');
+    return hh + ':' + min + ' ' + yy + '-' + mm + '-' + dd;
+  }
+
   function renderRecent(images, reports) {
     var items = [];
     if (images && images.length) {
       images.slice(0, 5).forEach(function (img) {
-        items.push({ text: 'Ảnh ' + (img.image_id || img.id) + ' - ' + (img.image_type || '') + ' (' + (img.upload_time || img.created_at || '') + ')', url: 'my-images.html' });
+        var timeStr = formatDateTime(img.upload_time || img.created_at);
+        items.push({ text: 'Ảnh ' + (img.image_id || img.id) + ' - ' + (img.image_type || '') + ' (' + timeStr + ')', url: 'my-images.html' });
       });
     }
     if (reports && reports.reports && reports.reports.length) {
       reports.reports.slice(0, 3).forEach(function (r) {
-        items.push({ text: 'Báo cáo ' + (r.report_id || r.id) + ' - ' + (r.created_at || ''), url: 'reports.html' });
+        var timeStr = formatDateTime(r.created_at);
+        items.push({ text: 'Báo cáo ' + (r.report_id || r.id) + ' (' + timeStr + ')', url: 'reports.html' });
       });
     }
     if (!items.length) {
@@ -58,11 +75,8 @@
     window.AuraAPI.getPatientByAccount(accountId)
       .then(function (patient) {
         if (!patient || !patient.patient_id) {
-          showError('Bạn chưa có hồ sơ bệnh nhân. Vui lòng cập nhật <a href="profile.html">Hồ sơ</a>.');
-          setStat(statImages, 0);
-          setStat(statAnalyses, 0);
-          setStat(statReports, 0);
-          renderRecent([], { reports: [] });
+          // Chưa có profile, redirect đến trang setup
+          window.location.href = 'setup-profile.html';
           return;
         }
         patientId = patient.patient_id;
