@@ -44,9 +44,8 @@ def health_check():
     return success_response({"status": "healthy"}, "Subscription service is running")
 
 
-# FR-11: Patient mua gói demo (PTT chuyển khoản) - package_id 1-5
+# Backward-compatible legacy ID sets (older data/FE may still use these)
 PATIENT_PACKAGE_IDS = [1, 2, 3, 4, 5]
-# FR-28: Gói dịch vụ cấp phòng khám - package_id 6-8
 CLINIC_PACKAGE_IDS = [6, 7, 8]
 
 
@@ -65,14 +64,22 @@ def purchase_package_demo():
             return error_response('account_id and package_id are required', 400)
         account_id = int(account_id)
         package_id = int(package_id)
-        if package_id not in PATIENT_PACKAGE_IDS:
-            return error_response('Chỉ được chọn gói có id từ 1 đến 5', 400)
+        # Validate package type (FR-34). Keep legacy constraint as fallback.
         account = account_service.get_account_by_id(account_id)
         if not account:
             return not_found_response('Account not found')
         package = package_service.get_package_by_id(package_id)
         if not package:
             return not_found_response('Service package not found')
+        if hasattr(package, 'is_active') and not getattr(package, 'is_active', True):
+            return error_response('Gói dịch vụ đang tạm ngưng.', 400)
+        pkg_type = (getattr(package, 'package_type', None) or '').lower()
+        if pkg_type:
+            if pkg_type != 'patient':
+                return error_response('Gói này không dành cho bệnh nhân.', 400)
+        else:
+            if package_id not in PATIENT_PACKAGE_IDS:
+                return error_response('Chỉ được chọn gói có id từ 1 đến 5', 400)
         # Mỗi gói mới: remaining_credits = image_limit của gói đó. Tổng remaining = tổng tất cả gói active - số lần đã up ảnh.
         remaining_credits = package.image_limit or 0
         start_date = date.today()
@@ -129,14 +136,22 @@ def purchase_clinic_package_demo():
             return error_response('account_id and package_id are required', 400)
         account_id = int(account_id)
         package_id = int(package_id)
-        if package_id not in CLINIC_PACKAGE_IDS:
-            return error_response('Chỉ được chọn gói cấp phòng khám (id 6, 7 hoặc 8)', 400)
+        # Validate package type (FR-34). Keep legacy constraint as fallback.
         account = account_service.get_account_by_id(account_id)
         if not account:
             return not_found_response('Account not found')
         package = package_service.get_package_by_id(package_id)
         if not package:
             return not_found_response('Service package not found')
+        if hasattr(package, 'is_active') and not getattr(package, 'is_active', True):
+            return error_response('Gói dịch vụ đang tạm ngưng.', 400)
+        pkg_type = (getattr(package, 'package_type', None) or '').lower()
+        if pkg_type:
+            if pkg_type != 'clinic':
+                return error_response('Gói này không dành cho phòng khám.', 400)
+        else:
+            if package_id not in CLINIC_PACKAGE_IDS:
+                return error_response('Chỉ được chọn gói cấp phòng khám (id 6, 7 hoặc 8)', 400)
         remaining_credits = package.image_limit or 0
         start_date = date.today()
         end_date = start_date + timedelta(days=package.duration_days)

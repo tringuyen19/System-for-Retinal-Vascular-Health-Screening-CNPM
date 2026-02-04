@@ -43,7 +43,7 @@ class AdminService:
         self.payment_repository = payment_repository
         self.subscription_repository = subscription_repository
         self.model_version_repository = model_version_repository
-      
+        
         # Retraining policies storage (in-memory, can be persisted to file/DB later)
         self._retraining_policies = {
             'auto_retrain': False,
@@ -56,8 +56,8 @@ class AdminService:
             'retrain_on_error_rate': True,
             'max_error_rate_threshold': 0.15  # 15% error rate triggers retrain
         }
-
-     # Privacy settings storage (in-memory, can be persisted to file/DB later) - FR-37
+        
+        # Privacy settings storage (in-memory, can be persisted to file/DB later) - FR-37
         self._privacy_settings = {
             'data_retention_days': 365,  # Days to retain data
             'auto_anonymize_after_days': 730,  # Auto anonymize after 2 years
@@ -100,7 +100,7 @@ class AdminService:
                 'priority': 'urgent'
             }
         }
-
+    
     # ========== FR-35: Global Dashboard ==========
     
     def get_dashboard_summary(self) -> Dict[str, Any]:
@@ -108,73 +108,109 @@ class AdminService:
         Get global dashboard summary (FR-35)
         Returns: usage, revenue, and AI performance metrics
         """
-        # Get all accounts
-        all_accounts = self.account_repository.get_all()
-        
-        # Count by role - Get role names dynamically
-        from infrastructure.repositories.role_repository import RoleRepository
-        from infrastructure.databases.mssql import session
-        role_repo = RoleRepository(session)
-        
-        patient_role = role_repo.get_by_name('Patient')
-        doctor_role = role_repo.get_by_name('Doctor')
-        
-        users_count = sum(1 for acc in all_accounts if patient_role and acc.role_id == patient_role.role_id)
-        doctors_count = sum(1 for acc in all_accounts if doctor_role and acc.role_id == doctor_role.role_id)
+        def _norm(s: Any) -> str:
+            return str(s).strip().lower() if s is not None else ''
+
+        # IMPORTANT (FR-35/FR-31): Total users = total patient_profiles + total doctor_profiles
+        # (not total accounts), so it updates correctly when profiles are created/deleted.
+        patient_profiles = self.patient_repository.get_all() if self.patient_repository else []
+        doctor_profiles = self.doctor_repository.get_all() if self.doctor_repository else []
+        patients_count = len(patient_profiles)
+        doctors_count = len(doctor_profiles)
+        users_count = patients_count + doctors_count
+
+        # Optional: include total accounts for broader "user" definition (admin/clinic_manager)
+        try:
+            total_accounts = len(self.account_repository.get_all()) if self.account_repository else None
+        except Exception:
+            total_accounts = None
+
         clinics_count = len(self.clinic_repository.get_all())
-        
-        # Get all images
+
+        # Usage: images
         all_images = self.image_repository.get_all()
         total_images = len(all_images)
-        
-        # Get all analyses
+        images_by_status: Dict[str, int] = {}
+        for img in all_images:
+            st = _norm(getattr(img, 'status', None)) or 'unknown'
+            images_by_status[st] = images_by_status.get(st, 0) + 1
+
+        # Usage: analyses
         all_analyses = self.analysis_repository.get_all()
         total_analyses = len(all_analyses)
-        completed_analyses = sum(1 for a in all_analyses if hasattr(a, 'status') and a.status == 'completed')
-        
-        # Calculate revenue (from payments)
+        analyses_by_status: Dict[str, int] = {}
+        for a in all_analyses:
+            st = _norm(getattr(a, 'status', None)) or 'unknown'
+            analyses_by_status[st] = analyses_by_status.get(st, 0) + 1
+        completed_analyses = analyses_by_status.get('completed', 0)
+        failed_analyses = analyses_by_status.get('failed', 0)
+        pending_analyses = analyses_by_status.get('pending', 0)
+        processing_analyses = analyses_by_status.get('processing', 0)
+
+        # Revenue (from payments)
         all_payments = self.payment_repository.get_all()
-        total_revenue = sum(float(p.amount) for p in all_payments if p.status == 'completed')
-        
-        # Get AI performance metrics
+        completed_payments = [p for p in all_payments if _norm(getattr(p, 'status', None)) == 'completed']
+        total_revenue = sum(float(getattr(p, 'amount', 0) or 0) for p in completed_payments)
+        payments_by_status: Dict[str, int] = {}
+        for p in all_payments:
+            st = _norm(getattr(p, 'status', None)) or 'unknown'
+            payments_by_status[st] = payments_by_status.get(st, 0) + 1
+
+        # AI performance metrics
         all_results = self.result_repository.get_all()
-        if all_results:
-            avg_confidence = sum(float(r.confidence_score) for r in all_results) / len(all_results)
-            risk_distribution = {
-                'low': sum(1 for r in all_results if r.risk_level == 'low'),
-                'medium': sum(1 for r in all_results if r.risk_level == 'medium'),
-                'high': sum(1 for r in all_results if r.risk_level == 'high'),
-                'critical': sum(1 for r in all_results if r.risk_level == 'critical')
-            }
-        else:
-            avg_confidence = 0.0
-            risk_distribution = {'low': 0, 'medium': 0, 'high': 0, 'critical': 0}
-        
+        risk_distribution: Dict[str, int] = {'low': 0, 'medium': 0, 'high': 0, 'critical': 0, 'unknown': 0}
+        confidence_scores: List[float] = []
+        for r in all_results:
+            rl = _norm(getattr(r, 'risk_level', None)) or 'unknown'
+            if rl not in risk_distribution:
+                rl = 'unknown'
+            risk_distribution[rl] = risk_distribution.get(rl, 0) + 1
+            cs = getattr(r, 'confidence_score', None)
+            if cs is not None:
+                try:
+                    confidence_scores.append(float(cs))
+                except Exception:
+                    pass
+        avg_confidence = (sum(confidence_scores) / len(confidence_scores)) if confidence_scores else 0.0
+
         # Get active AI model
         active_model = self.model_version_repository.get_active_model()
         active_model_info = None
         if active_model:
             active_model_info = {
+                'ai_model_version_id': getattr(active_model, 'ai_model_version_id', None),
                 'model_name': active_model.model_name,
                 'version': active_model.version,
                 'trained_at': active_model.trained_at.isoformat() if active_model.trained_at else None
             }
+
+        # AI throughput quality: success rate based on completed analyses (ratio 0..1 for frontend)
+        success_rate = (completed_analyses / total_analyses) if total_analyses > 0 else 0
         
         return {
             'users': {
                 'total_users': users_count,
+                'total_accounts': total_accounts,
                 'total_doctors': doctors_count,
+                'total_patients': patients_count,
                 'total_clinics': clinics_count
             },
             'usage': {
                 'total_images': total_images,
                 'total_analyses': total_analyses,
                 'completed_analyses': completed_analyses,
-                'success_rate': (completed_analyses / total_analyses * 100) if total_analyses > 0 else 0
+                'failed_analyses': failed_analyses,
+                'pending_analyses': pending_analyses,
+                'processing_analyses': processing_analyses,
+                'images_by_status': images_by_status,
+                'analyses_by_status': analyses_by_status,
+                # success_rate as ratio (0..1) - frontend will convert to %
+                'success_rate': success_rate
             },
             'revenue': {
                 'total_revenue': round(total_revenue, 2),
-                'total_payments': len([p for p in all_payments if p.status == 'completed'])
+                'total_payments': len(completed_payments),
+                'payments_by_status': payments_by_status
             },
             'ai_performance': {
                 'average_confidence': round(avg_confidence, 2),
@@ -191,73 +227,69 @@ class AdminService:
         Args:
             days: Number of days to look back
         """
+        # Treat 0 as "all time" for UI parity
+        if days == 0:
+            days = None
+        # Prefer repository-level analytics (single query, consistent filtering)
+        if hasattr(self.image_repository, 'get_image_analytics'):
+            return self.image_repository.get_image_analytics(days=days)
+        # Fallback (legacy)
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=days)
-        
+        start_date = end_date - timedelta(days=days or 30)
         all_images = self.image_repository.get_all()
-        
-        # Filter by date range
         recent_images = [
             img for img in all_images
             if hasattr(img, 'upload_time') and img.upload_time and start_date <= img.upload_time <= end_date
         ]
-        
-        # Count by type
         type_distribution = {}
+        status_distribution = {}
         for img in recent_images:
             img_type = getattr(img, 'image_type', 'unknown')
             type_distribution[img_type] = type_distribution.get(img_type, 0) + 1
-        
-        # Count by status
-        status_distribution = {}
-        for img in recent_images:
             status = getattr(img, 'status', 'unknown')
             status_distribution[status] = status_distribution.get(status, 0) + 1
-        
         return {
-            'period_days': days,
+            'period_days': days or 30,
+            'period_label': f'Trong {days or 30} ngày gần đây',
             'total_images': len(recent_images),
             'type_distribution': type_distribution,
             'status_distribution': status_distribution,
-            'daily_upload_trend': self._calculate_daily_trend(recent_images, 'upload_time')
+            'daily_upload_trend': self._calculate_daily_trend(recent_images, 'upload_time'),
+            'has_data': len(recent_images) > 0
         }
     
-    def get_risk_distribution_analytics(self) -> Dict[str, Any]:
+    def get_risk_distribution_analytics(self, days: Optional[int] = 30) -> Dict[str, Any]:
         """
         Get risk distribution analytics (FR-36)
         """
+        if days == 0:
+            days = None
+        # Prefer repository-level analytics (worst-risk per analysis, period filtering)
+        if hasattr(self.result_repository, 'get_risk_distribution_analytics'):
+            return self.result_repository.get_risk_distribution_analytics(days=days)
+        # Fallback (legacy: per-result distribution, all-time)
         all_results = self.result_repository.get_all()
-        
-        risk_distribution = {
-            'low': 0,
-            'medium': 0,
-            'high': 0,
-            'critical': 0
-        }
-        
+        risk_distribution = {'low': 0, 'medium': 0, 'high': 0, 'critical': 0, 'unknown': 0}
         confidence_scores = []
-        
         for result in all_results:
-            risk_level = result.risk_level.lower() if result.risk_level else 'unknown'
-            if risk_level in risk_distribution:
-                risk_distribution[risk_level] += 1
-            
+            risk_level = (result.risk_level or 'unknown').lower()
+            if risk_level not in risk_distribution:
+                risk_level = 'unknown'
+            risk_distribution[risk_level] += 1
             if result.confidence_score:
                 confidence_scores.append(float(result.confidence_score))
-        
         total = sum(risk_distribution.values())
-        percentages = {
-            k: round((v / total * 100), 2) if total > 0 else 0
-            for k, v in risk_distribution.items()
-        }
-        
+        percentages = {k: round((v / total * 100), 2) if total > 0 else 0 for k, v in risk_distribution.items()}
         return {
+            'period_days': None,
+            'period_label': 'Tất cả thời gian',
             'risk_distribution': risk_distribution,
             'risk_percentages': percentages,
-            'total_results': total,
+            'total_analyses': total,
             'average_confidence': round(sum(confidence_scores) / len(confidence_scores), 2) if confidence_scores else 0,
             'min_confidence': round(min(confidence_scores), 2) if confidence_scores else 0,
-            'max_confidence': round(max(confidence_scores), 2) if confidence_scores else 0
+            'max_confidence': round(max(confidence_scores), 2) if confidence_scores else 0,
+            'has_data': total > 0
         }
     
     def get_revenue_analytics(self, days: Optional[int] = 30) -> Dict[str, Any]:
@@ -310,33 +342,43 @@ class AdminService:
             'has_data': len(completed_payments) > 0
         }
     
-    def get_error_rate_analytics(self) -> Dict[str, Any]:
+    def get_error_rate_analytics(self, days: Optional[int] = 30) -> Dict[str, Any]:
         """
         Get error rate analytics (FR-36)
         """
+        if days == 0:
+            days = None
+        if hasattr(self.analysis_repository, 'get_error_rate_analytics'):
+            return self.analysis_repository.get_error_rate_analytics(days=days)
+        # Fallback (legacy: all-time)
         all_analyses = self.analysis_repository.get_all()
-        
         total = len(all_analyses)
         if total == 0:
             return {
+                'period_days': None,
+                'period_label': 'Tất cả thời gian',
                 'total_analyses': 0,
+                'failed_analyses': 0,
                 'error_rate': 0,
-                'status_breakdown': {}
+                'status_breakdown': {},
+                'daily_failure_trend': [],
+                'has_data': False
             }
-        
         status_breakdown = {}
         for analysis in all_analyses:
-            status = getattr(analysis, 'status', 'unknown')
+            status = (getattr(analysis, 'status', 'unknown') or 'unknown')
             status_breakdown[status] = status_breakdown.get(status, 0) + 1
-        
         failed_count = status_breakdown.get('failed', 0)
         error_rate = (failed_count / total * 100) if total > 0 else 0
-        
         return {
+            'period_days': None,
+            'period_label': 'Tất cả thời gian',
             'total_analyses': total,
             'failed_analyses': failed_count,
             'error_rate': round(error_rate, 2),
-            'status_breakdown': status_breakdown
+            'status_breakdown': status_breakdown,
+            'daily_failure_trend': [],
+            'has_data': True
         }
     
     # ========== FR-33: AI Configuration ==========
@@ -403,7 +445,7 @@ class AdminService:
             'retrain_on_error_rate': self._retraining_policies.get('retrain_on_error_rate', True),
             'max_error_rate_threshold': self._retraining_policies.get('max_error_rate_threshold', 0.15)
         }
-
+        
         return {
             'active_model': active_config,
             'all_models': models_info,
@@ -475,7 +517,7 @@ class AdminService:
                 error_rate = retraining_policy['max_error_rate_threshold']
                 if not isinstance(error_rate, (int, float)) or not (0 <= error_rate <= 1):
                     raise ValueError("max_error_rate_threshold must be a number between 0 and 1")
-
+        
         return self.get_ai_configuration()
     
     # ========== Helper Methods ==========
@@ -515,7 +557,7 @@ class AdminService:
         ]
         
         return trend
- 
+    
     # ========== FR-37: Privacy Settings Management ==========
     
     def get_privacy_settings(self) -> Dict[str, Any]:

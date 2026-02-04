@@ -53,6 +53,18 @@ class ServicePackageService:
     
     def update_package(self, package_id: int, **kwargs) -> Optional[ServicePackage]:
         """Update package"""
+        # Guard rails for updates
+        if 'price' in kwargs and kwargs['price'] is not None and Decimal(str(kwargs['price'])) < 0:
+            raise ValueError("Price must be positive")
+        if 'image_limit' in kwargs and kwargs['image_limit'] is not None and int(kwargs['image_limit']) < 0:
+            raise ValueError("Image limit must be positive")
+        if 'duration_days' in kwargs and kwargs['duration_days'] is not None and int(kwargs['duration_days']) < 1:
+            raise ValueError("Duration must be at least 1 day")
+        if 'package_type' in kwargs and kwargs['package_type'] is not None:
+            pt = str(kwargs['package_type']).strip().lower()
+            if pt not in ['patient', 'clinic']:
+                raise ValueError("package_type must be 'patient' or 'clinic'")
+            kwargs['package_type'] = pt
         return self.repository.update(package_id, **kwargs)
     
     def update_price(self, package_id: int, new_price: Decimal) -> Optional[ServicePackage]:

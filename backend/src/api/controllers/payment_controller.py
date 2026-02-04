@@ -516,6 +516,7 @@ def get_all_payments():
                 'subscription_id': p.subscription_id,
                 'amount': float(p.amount),
                 'payment_method': p.payment_method,
+                'payment_time': p.payment_time.isoformat() if p.payment_time else None,
                 'status': p.status
             } for p in payments]
         })

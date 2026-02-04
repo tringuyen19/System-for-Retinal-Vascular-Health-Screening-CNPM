@@ -120,6 +120,10 @@ def register():
         role = role_service.get_role_by_id(data['role_id'])
         if not role:
             return error_response('Role not found', 404)
+
+        # ClinicManager must be created via clinic registration flow (FR-22)
+        if data.get('role_id') == 4:
+            return error_response('Vui lòng đăng ký phòng khám tại /clinic-register.html để tạo tài khoản quản lý phòng khám.', 400)
         
         # Validate clinic_id exists (if provided)
         if data.get('clinic_id'):

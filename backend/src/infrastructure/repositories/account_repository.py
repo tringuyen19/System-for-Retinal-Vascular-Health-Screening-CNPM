@@ -206,3 +206,22 @@ class AccountRepository(IAccountRepository):
             raise ValueError(f'Error getting accounts by clinic: {str(e)}')
         finally:
             self.session.close()
+
+    def get_by_status(self, status: str) -> List[Account]:
+        """Get accounts by status (active, inactive, suspended)"""
+        try:
+            account_models = self.session.query(AccountModel).filter_by(status=status).all()
+            return [self._to_domain(model) for model in account_models]
+        except Exception as e:
+            raise ValueError(f'Error getting accounts by status: {str(e)}')
+        finally:
+            self.session.close()
+
+    def count_by_status(self, status: str) -> int:
+        """Count accounts by status"""
+        try:
+            return self.session.query(AccountModel).filter_by(status=status).count()
+        except Exception as e:
+            raise ValueError(f'Error counting accounts by status: {str(e)}')
+        finally:
+            self.session.close()

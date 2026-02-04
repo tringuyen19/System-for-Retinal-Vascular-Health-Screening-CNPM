@@ -65,6 +65,44 @@ class PaymentService:
     def get_payments_by_subscription(self, subscription_id: int) -> List[Payment]:
         """Get all payments for a subscription"""
         return self.repository.get_by_subscription(subscription_id)
+
+    def get_all_payments(self) -> List[Payment]:
+        """Get all payments (admin)"""
+        return self.repository.get_all()
+
+    def get_completed_payments(self) -> List[Payment]:
+        """Get all completed payments (admin)"""
+        return self.repository.get_by_status('completed')
+
+    def get_failed_payments(self) -> List[Payment]:
+        """Get all failed payments"""
+        return self.repository.get_by_status('failed')
+
+    def get_payments_by_method(self, payment_method: str) -> List[Payment]:
+        """Get all payments filtered by method"""
+        method = (payment_method or '').strip().lower()
+        if not method:
+            return []
+        # Repository doesn't expose by method yet; filter in service.
+        return [p for p in self.repository.get_all() if (p.payment_method or '').strip().lower() == method]
+
+    def get_payments_by_date_range(self, start: datetime, end: datetime) -> List[Payment]:
+        """Get payments between 2 datetimes (inclusive)."""
+        if not start or not end:
+            return []
+        if start > end:
+            start, end = end, start
+        items = self.repository.get_all()
+        out = []
+        for p in items:
+            t = getattr(p, 'payment_time', None)
+            if not t:
+                continue
+            if start <= t <= end:
+                out.append(p)
+        # newest first
+        out.sort(key=lambda x: x.payment_time or datetime.min, reverse=True)
+        return out
     
     def get_payment_history(self, account_id: int, limit: int = 50, offset: int = 0) -> List[Payment]:
         """
@@ -119,6 +157,10 @@ class PaymentService:
     def mark_as_failed(self, payment_id: int) -> Optional[Payment]:
         """Mark payment as failed"""
         return self.repository.mark_as_failed(payment_id)
+
+    def mark_as_refunded(self, payment_id: int) -> Optional[Payment]:
+        """Mark payment as refunded"""
+        return self.repository.mark_as_refunded(payment_id)
     
     def process_payment(self, payment_id: int) -> Optional[Payment]:
         """Process payment (simulate payment gateway)"""
@@ -157,8 +199,22 @@ class PaymentService:
         """Get total revenue"""
         return self.repository.get_total_revenue(status)
     
-    def get_revenue_by_date_range(self, start_date: date, end_date: date) -> Decimal:
-        """Get revenue by date range"""
+    def get_revenue_by_date_range(self, start_date: date, end_date: date, status: str = 'completed') -> Decimal:
+        """Get revenue by date range (optionally by status)."""
+        # Repository currently computes only completed revenue; keep backward compatibility.
+        if status and status != 'completed':
+            payments = self.repository.get_all()
+            total = Decimal(0)
+            for p in payments:
+                if (p.status or '').lower() != status.lower():
+                    continue
+                t = p.payment_time
+                if not t:
+                    continue
+                d = t.date()
+                if start_date <= d <= end_date:
+                    total += Decimal(str(p.amount))
+            return total
         return self.repository.get_revenue_by_date_range(start_date, end_date)
     
     def count_by_status(self, status: str) -> int:

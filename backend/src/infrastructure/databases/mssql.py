@@ -119,6 +119,64 @@ def _migrate_medical_report_fr16():
                     print(f">>> Migration skip {table_name}.{col_name}: {e}")
 
 
+def _migrate_service_packages_fr34():
+    """FR-34: Add package_type and is_active to service_packages table, and backfill existing rows."""
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        dialect = engine.dialect.name
+        table_name = 'service_packages'
+        # Add columns if missing
+        try:
+            if dialect == 'sqlite':
+                # SQLite: best-effort add columns
+                try:
+                    conn.execute(text(f'ALTER TABLE {table_name} ADD COLUMN package_type VARCHAR(20)'))
+                except Exception:
+                    pass
+                try:
+                    conn.execute(text(f'ALTER TABLE {table_name} ADD COLUMN is_active INTEGER'))
+                except Exception:
+                    pass
+                conn.commit()
+            else:
+                # MSSQL: conditional add
+                conn.execute(text(f"""
+                IF NOT EXISTS (SELECT * FROM sys.columns 
+                               WHERE object_id = OBJECT_ID(N'[dbo].[{table_name}]') 
+                               AND name = 'package_type')
+                BEGIN
+                    ALTER TABLE [dbo].[{table_name}] ADD [package_type] NVARCHAR(20) NULL;
+                END
+                """))
+                conn.execute(text(f"""
+                IF NOT EXISTS (SELECT * FROM sys.columns 
+                               WHERE object_id = OBJECT_ID(N'[dbo].[{table_name}]') 
+                               AND name = 'is_active')
+                BEGIN
+                    ALTER TABLE [dbo].[{table_name}] ADD [is_active] BIT NULL;
+                END
+                """))
+                conn.commit()
+            print(f">>> Migrated: {table_name}.package_type, {table_name}.is_active (if needed)")
+        except Exception as e:
+            print(f">>> Migration error for {table_name} FR-34: {e}")
+
+        # Backfill defaults for existing rows
+        try:
+            if dialect == 'sqlite':
+                conn.execute(text(f"UPDATE {table_name} SET is_active = 1 WHERE is_active IS NULL"))
+                conn.execute(text(f"UPDATE {table_name} SET package_type = 'patient' WHERE package_type IS NULL AND package_id <= 5"))
+                conn.execute(text(f"UPDATE {table_name} SET package_type = 'clinic' WHERE package_type IS NULL AND package_id > 5"))
+            else:
+                conn.execute(text(f"UPDATE [dbo].[{table_name}] SET is_active = 1 WHERE is_active IS NULL"))
+                conn.execute(text(f"UPDATE [dbo].[{table_name}] SET package_type = 'patient' WHERE package_type IS NULL AND package_id <= 5"))
+                conn.execute(text(f"UPDATE [dbo].[{table_name}] SET package_type = 'clinic' WHERE package_type IS NULL AND package_id > 5"))
+            conn.commit()
+            print(f">>> Backfilled: {table_name} FR-34 defaults")
+        except Exception as e:
+            print(f">>> Backfill skip {table_name} FR-34: {e}")
+
+
 def init_mssql(app):
     try:
         print(f">>> Starting table creation...")
@@ -131,6 +189,7 @@ def init_mssql(app):
         _migrate_medical_report_fr16()
         _migrate_doctor_review_fr19()
         _migrate_clinic_fr22()
+        _migrate_service_packages_fr34()
     except Exception as e:
         print(f"!!! Error creating tables: {e}")
         raise

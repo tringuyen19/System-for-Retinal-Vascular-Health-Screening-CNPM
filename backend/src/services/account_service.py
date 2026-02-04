@@ -134,7 +134,10 @@ class AccountService:
         return self.repository.get_by_role(role_id)
     
     def update_account(self, account_id: int, **kwargs) -> Optional[Account]:
-        """Update account"""
+        """Update account. If 'password' is provided (plain), it is hashed to password_hash."""
+        if 'password' in kwargs and kwargs['password']:
+            plain = kwargs.pop('password')
+            kwargs['password_hash'] = self._hash_password(plain)
         return self.repository.update(account_id, **kwargs)
     
     def change_password(self, account_id: int, new_password_hash: str) -> Optional[Account]:
@@ -173,6 +176,33 @@ class AccountService:
         """Update password (alias for change_password)"""
         return self.change_password(account_id, new_password_hash)
 
+    def set_password_plain(self, account_id: int, new_plain_password: str) -> Optional[Account]:
+        """Set account password from plain text (e.g. admin reset). Hashes internally."""
+        AccountValidator.validate_password(new_plain_password)
+        hashed = self._hash_password(new_plain_password)
+        return self.repository.update_password(account_id, hashed)
+    
     def get_accounts_by_clinic(self, clinic_id: int) -> List[Account]:
         """Get all accounts in a clinic"""
         return self.repository.get_by_clinic(clinic_id)
+
+    def get_accounts_by_status(self, status: str) -> List[Account]:
+        """Get accounts by status (active, inactive, suspended)"""
+        return self.repository.get_by_status(status)
+
+    def count_by_status(self, status: str) -> int:
+        """Count accounts by status"""
+        return self.repository.count_by_status(status)
+
+    def get_account_statistics(self) -> dict:
+        """Get overall account statistics (total, by status, by role)."""
+        total = self.repository.count()
+        return {
+            'total': total,
+            'by_status': {
+                'active': self.repository.count_by_status('active'),
+                'inactive': self.repository.count_by_status('inactive'),
+                'suspended': self.repository.count_by_status('suspended'),
+            },
+        }
+

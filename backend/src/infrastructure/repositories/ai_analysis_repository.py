@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime, date
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -208,5 +208,85 @@ class AiAnalysisRepository(IAiAnalysisRepository):
             return [self._to_domain(model) for model in analysis_models]
         except Exception as e:
             raise ValueError(f'Error getting analyses by patient: {str(e)}')
+        finally:
+            self.session.close()
+
+    def get_error_rate_analytics(self, days: Optional[int] = 30) -> Dict[str, Any]:
+        """
+        FR-36: Error rate analytics over a period.
+        - days: None or 0 => all time
+        Returns:
+          {
+            period_days, period_label,
+            total_analyses, failed_analyses, error_rate,
+            status_breakdown,
+            daily_failure_trend: [{date, total, failed, error_rate}]
+          }
+        """
+        try:
+            from datetime import timedelta
+
+            end_dt = datetime.now()
+            start_dt = None
+            if days not in (None, 0):
+                start_dt = end_dt - timedelta(days=int(days))
+
+            q = self.session.query(AiAnalysisModel.analysis_time, AiAnalysisModel.status)
+            if start_dt is not None:
+                q = q.filter(AiAnalysisModel.analysis_time >= start_dt).filter(AiAnalysisModel.analysis_time <= end_dt)
+
+            rows = q.all()
+
+            status_breakdown: Dict[str, int] = {}
+            daily_total: Dict[str, int] = {}
+            daily_failed: Dict[str, int] = {}
+
+            for analysis_time, status in rows:
+                st = (status or 'unknown').strip().lower()
+                status_breakdown[st] = status_breakdown.get(st, 0) + 1
+
+                if analysis_time:
+                    dk = analysis_time.date().isoformat()
+                    daily_total[dk] = daily_total.get(dk, 0) + 1
+                    if st == 'failed':
+                        daily_failed[dk] = daily_failed.get(dk, 0) + 1
+
+            total = len(rows)
+            failed = status_breakdown.get('failed', 0)
+            completed = status_breakdown.get('completed', 0)
+            terminal_total = failed + completed
+            # Prefer "terminal" error rate: failed / (failed + completed)
+            error_rate = (failed / terminal_total * 100.0) if terminal_total > 0 else 0.0
+            # Also provide all-status error rate for context (includes pending/processing)
+            error_rate_all = (failed / total * 100.0) if total > 0 else 0.0
+
+            all_dates = sorted(set(list(daily_total.keys()) + list(daily_failed.keys())))
+            daily_failure_trend = []
+            for d in all_dates:
+                t = daily_total.get(d, 0)
+                f = daily_failed.get(d, 0)
+                daily_failure_trend.append({
+                    'date': d,
+                    'total': t,
+                    'failed': f,
+                    'error_rate_all': round((f / t * 100.0), 2) if t > 0 else 0.0
+                })
+
+            period_label = 'Tất cả thời gian' if days in (None, 0) else f'Trong {int(days)} ngày gần đây'
+            return {
+                'period_days': None if days in (None, 0) else int(days),
+                'period_label': period_label,
+                'total_analyses': total,
+                'failed_analyses': failed,
+                'completed_analyses': completed,
+                'terminal_total': terminal_total,
+                'error_rate': round(error_rate, 2),
+                'error_rate_all': round(error_rate_all, 2),
+                'status_breakdown': status_breakdown,
+                'daily_failure_trend': daily_failure_trend,
+                'has_data': total > 0
+            }
+        except Exception as e:
+            raise ValueError(f'Error getting error rate analytics: {str(e)}')
         finally:
             self.session.close()

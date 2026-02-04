@@ -113,7 +113,8 @@ class ClinicService:
                 password=manager_password,
                 role_id=4,  # ClinicManager role
                 clinic_id=clinic.clinic_id,
-                status='active'  # Active by default, but clinic needs verification
+                # IMPORTANT: Manager account must be inactive until clinic is verified by admin.
+                status='inactive'
             )
             
             if not account:
@@ -130,6 +131,20 @@ class ClinicService:
             except:
                 pass
             raise e
+
+    def _set_clinic_manager_accounts_status(self, clinic_id: int, status: str) -> None:
+        """Set status for ClinicManager accounts of a clinic (best-effort)."""
+        if not self.account_repository:
+            return
+        try:
+            accounts = self.account_repository.get_by_clinic(clinic_id)
+            for a in accounts:
+                # ClinicManager role_id = 4
+                if getattr(a, 'role_id', None) == 4:
+                    self.account_repository.update_status(a.account_id, status)
+        except Exception:
+            # Don't block clinic verification workflow if account status update fails
+            pass
     
     def get_clinic_by_id(self, clinic_id: int) -> Optional[Clinic]:
         """Get clinic by ID"""
@@ -180,7 +195,11 @@ class ClinicService:
                 f"Only clinics with 'pending' status can be verified."
             )
         
-        return self.repository.verify_clinic(clinic_id)
+        clinic = self.repository.verify_clinic(clinic_id)
+        if clinic:
+            # Activate clinic manager accounts upon verification
+            self._set_clinic_manager_accounts_status(clinic_id, 'active')
+        return clinic
     
     def reject_clinic(self, clinic_id: int, rejection_reason: Optional[str] = None) -> Optional[Clinic]:
         """
@@ -214,7 +233,11 @@ class ClinicService:
             # Log warning but proceed
             print(f"Warning: Rejecting clinic {clinic_id} without rejection reason")
         
-        return self.repository.reject_clinic(clinic_id)
+        clinic = self.repository.reject_clinic(clinic_id)
+        if clinic:
+            # Keep manager accounts inactive if clinic is rejected
+            self._set_clinic_manager_accounts_status(clinic_id, 'inactive')
+        return clinic
     
     def approve_clinic(self, clinic_id: int, admin_notes: Optional[str] = None) -> Optional[Clinic]:
         """
@@ -246,7 +269,11 @@ class ClinicService:
         if not admin_notes:
             print(f"Info: Approving clinic {clinic_id} without admin notes")
         
-        return self.repository.approve_clinic(clinic_id)
+        clinic = self.repository.approve_clinic(clinic_id)
+        if clinic and clinic.verification_status == 'verified':
+            # Activate clinic manager accounts upon approval/unsuspend
+            self._set_clinic_manager_accounts_status(clinic_id, 'active')
+        return clinic
     
     def suspend_clinic(self, clinic_id: int, suspension_reason: Optional[str] = None) -> Optional[Clinic]:
         """
@@ -274,7 +301,11 @@ class ClinicService:
         if not suspension_reason:
             print(f"Warning: Suspending clinic {clinic_id} without suspension reason")
         
-        return self.repository.suspend_clinic(clinic_id)
+        clinic = self.repository.suspend_clinic(clinic_id)
+        if clinic:
+            # Suspend clinic manager accounts when clinic is suspended
+            self._set_clinic_manager_accounts_status(clinic_id, 'suspended')
+        return clinic
     
     def update_clinic(self, clinic_id: int, **kwargs) -> Optional[Clinic]:
         """Update clinic information"""

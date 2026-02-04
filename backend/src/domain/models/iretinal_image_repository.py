@@ -58,3 +58,14 @@ class IRetinalImageRepository(ABC):
     def count_by_status(self, status: str) -> int:
         pass
 
+    @abstractmethod
+    def get_image_analytics(self, days: Optional[int] = 30) -> dict:
+        """
+        Admin analytics (FR-36): image upload analytics over a period.
+        Args:
+            days: Number of days to look back; None or 0 means all time.
+        Returns:
+            Dict with total_images, type_distribution, status_distribution, daily_upload_trend, etc.
+        """
+        pass
+

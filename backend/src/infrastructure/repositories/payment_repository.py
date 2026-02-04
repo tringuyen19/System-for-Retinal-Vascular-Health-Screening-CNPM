@@ -105,6 +105,22 @@ class PaymentRepository(IPaymentRepository):
             raise ValueError(f'Error marking payment as failed: {str(e)}')
         finally:
             self.session.close()
+
+    def mark_as_refunded(self, payment_id: int) -> Optional[Payment]:
+        """Mark payment as refunded"""
+        try:
+            payment_model = self.session.query(PaymentModel).filter_by(payment_id=payment_id).first()
+            if not payment_model:
+                return None
+            payment_model.status = 'refunded'
+            self.session.commit()
+            self.session.refresh(payment_model)
+            return self._to_domain(payment_model)
+        except Exception as e:
+            self.session.rollback()
+            raise ValueError(f'Error marking payment as refunded: {str(e)}')
+        finally:
+            self.session.close()
     
     def update(self, payment_id: int, **kwargs) -> Optional[Payment]:
         try:

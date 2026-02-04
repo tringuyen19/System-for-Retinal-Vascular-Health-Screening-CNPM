@@ -14,7 +14,9 @@ class ServicePackageRepository(IServicePackageRepository):
     def _to_domain(self, model: ServicePackageModel) -> ServicePackage:
         return ServicePackage(
             package_id=model.package_id, name=model.name, price=model.price,
-            image_limit=model.image_limit, duration_days=model.duration_days
+            image_limit=model.image_limit, duration_days=model.duration_days,
+            package_type=(model.package_type or ('patient' if model.package_id and model.package_id <= 5 else 'clinic')),
+            is_active=(True if model.is_active is None else bool(model.is_active))
         )
     
     def add(self, name: str, price: Decimal, image_limit: int, duration_days: int) -> ServicePackage:

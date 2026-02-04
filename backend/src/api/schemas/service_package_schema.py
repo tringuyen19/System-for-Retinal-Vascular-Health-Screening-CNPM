@@ -6,6 +6,8 @@ class ServicePackageCreateRequestSchema(Schema):
     price = fields.Decimal(required=True, as_string=True, metadata={'description': "Package price"})
     image_limit = fields.Int(required=True, metadata={'description': "Number of images allowed"})
     duration_days = fields.Int(required=True, metadata={'description': "Package duration in days"})
+    package_type = fields.Str(load_default="patient", metadata={'description': "Package type: patient|clinic"})
+    is_active = fields.Bool(load_default=True, metadata={'description': "Whether the package is active"})
 
 class ServicePackageUpdateRequestSchema(Schema):
     """Schema for updating a Service Package"""
@@ -13,6 +15,8 @@ class ServicePackageUpdateRequestSchema(Schema):
     price = fields.Decimal(as_string=True, metadata={'description': "Package price"})
     image_limit = fields.Int(metadata={'description': "Number of images allowed"})
     duration_days = fields.Int(metadata={'description': "Package duration in days"})
+    package_type = fields.Str(metadata={'description': "Package type: patient|clinic"})
+    is_active = fields.Bool(metadata={'description': "Whether the package is active"})
 
 class ServicePackageResponseSchema(Schema):
     """Schema for Service Package response"""
@@ -21,4 +25,6 @@ class ServicePackageResponseSchema(Schema):
     price = fields.Decimal(required=True, as_string=True, metadata={'description': "Package price"})
     image_limit = fields.Int(required=True, metadata={'description': "Number of images allowed"})
     duration_days = fields.Int(required=True, metadata={'description': "Package duration in days"})
+    package_type = fields.Str(required=False, metadata={'description': "Package type: patient|clinic"})
+    is_active = fields.Bool(required=False, metadata={'description': "Whether the package is active"})
 

@@ -98,6 +98,14 @@ def create_package():
             image_limit=int(data['image_limit']),
             duration_days=int(data['duration_days'])
         )
+        # Persist optional FR-34 fields
+        update_payload = {}
+        if data.get('package_type'):
+            update_payload['package_type'] = str(data.get('package_type')).strip().lower()
+        if data.get('is_active') is not None:
+            update_payload['is_active'] = bool(data.get('is_active'))
+        if update_payload:
+            package = package_service.update_package(package.package_id, **update_payload) or package
         
         response_schema = ServicePackageResponseSchema()
         return success_response(response_schema.dump(package), 'Package created successfully', 201)
@@ -198,7 +206,9 @@ def get_all_packages():
     try:
         min_price = request.args.get('min_price', type=float)
         max_price = request.args.get('max_price', type=float)
-        ids_param = request.args.get('ids')  # e.g. "1,2,3,4,5" for FR-11 patient packages
+        ids_param = request.args.get('ids')  # backward compatible
+        type_param = request.args.get('type')  # 'patient' | 'clinic'
+        active_param = request.args.get('active')  # '1' | '0'
         package_ids = None
         if ids_param:
             try:
@@ -207,6 +217,12 @@ def get_all_packages():
                 pass
         
         all_packages = package_service.list_all_packages()
+        if type_param:
+            t = str(type_param).strip().lower()
+            all_packages = [p for p in all_packages if (getattr(p, 'package_type', None) or '').lower() == t]
+        if active_param is not None and active_param != '':
+            want_active = str(active_param) in ['1', 'true', 'True', 'yes', 'on']
+            all_packages = [p for p in all_packages if bool(getattr(p, 'is_active', True)) == want_active]
         if package_ids:
             all_packages = [p for p in all_packages if getattr(p, 'package_id', p.id if hasattr(p, 'id') else None) in package_ids]
         if min_price is not None and max_price is not None:
@@ -220,7 +236,9 @@ def get_all_packages():
                 'name': p.name,
                 'price': float(p.price),
                 'image_limit': p.image_limit,
-                'duration_days': p.duration_days
+                'duration_days': p.duration_days,
+                'package_type': getattr(p, 'package_type', None),
+                'is_active': bool(getattr(p, 'is_active', True))
             } for p in packages]
         })
         

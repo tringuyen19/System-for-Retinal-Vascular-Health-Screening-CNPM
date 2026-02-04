@@ -3,18 +3,33 @@ from marshmallow import ValidationError
 from api.middleware.auth_middleware import require_roles, require_role
 from infrastructure.repositories.account_repository import AccountRepository
 from infrastructure.repositories.role_repository import RoleRepository
-from infrastructure.databases.mssql import session
+from infrastructure.databases.mssql import session as db_session
+from infrastructure.models.account_model import AccountModel
+from infrastructure.models.profiles.doctor_profile_model import DoctorProfileModel
+from infrastructure.models.medical.doctor_review_model import DoctorReviewModel
+from infrastructure.models.medical.medical_report_model import MedicalReportModel
+from infrastructure.models.messaging.conversation_model import ConversationModel
+from infrastructure.models.messaging.message_model import MessageModel
+from infrastructure.models.profiles.patient_profile_model import PatientProfileModel
+from infrastructure.models.imaging.retinal_image_model import RetinalImageModel
+from infrastructure.models.ai.ai_analysis_model import AiAnalysisModel
+from infrastructure.models.ai.ai_result_model import AiResultModel
+from infrastructure.models.ai.ai_annotation_model import AiAnnotationModel
+from infrastructure.models.billing.subscription_model import SubscriptionModel
+from infrastructure.models.billing.payment_model import PaymentModel
+from infrastructure.models.notification_model import NotificationModel
 from services.account_service import AccountService
 from services.role_service import RoleService
 from api.responses import success_response, error_response, not_found_response, validation_error_response
 from api.schemas import AccountCreateRequestSchema, AccountUpdateRequestSchema, AccountResponseSchema
+from domain.exceptions import ValidationException
 from datetime import datetime
 
 account_bp = Blueprint('account', __name__, url_prefix='/api/accounts')
 
 # Initialize repositories (only for service initialization)
-account_repo = AccountRepository(session)
-role_repo = RoleRepository(session)
+account_repo = AccountRepository(db_session)
+role_repo = RoleRepository(db_session)
 
 # Initialize SERVICES (Business Logic Layer) ✅
 account_service = AccountService(account_repo)
@@ -470,11 +485,15 @@ def update_password(account_id):
         description: Account not found
     """
     try:
-        data = request.get_json()
-        if not data.get('new_password_hash'):
-            return validation_error_response({'new_password_hash': 'New password hash is required'})
+        data = request.get_json() or {}
+        # Admin/frontend can send plain new_password; backend hashes it. Or send new_password_hash.
+        if data.get('new_password'):
+            account = account_service.set_password_plain(account_id, data['new_password'])
+        elif data.get('new_password_hash'):
+            account = account_service.update_password(account_id, data['new_password_hash'])
+        else:
+            return validation_error_response({'new_password': 'new_password or new_password_hash is required'})
         
-        account = account_service.update_password(account_id, data['new_password_hash'])
         if not account:
             return not_found_response('Account not found')
         
@@ -482,6 +501,8 @@ def update_password(account_id):
             'account_id': account.account_id
         }, 'Password updated successfully')
         
+    except ValidationException as e:
+        return error_response(str(e), 400)
     except ValueError as e:
         return error_response(str(e), 400)
     except Exception as e:
@@ -567,7 +588,8 @@ def update_status(account_id):
 @require_role('Admin')
 def delete_account(account_id):
     """
-    Delete account
+    Delete account. If account has a doctor profile, cascades: doctor_reviews,
+    medical_reports, messages/conversations, doctor_profile, then account.
     ---
     tags:
       - Account
@@ -586,16 +608,62 @@ def delete_account(account_id):
         description: Account not found
     """
     try:
-        result = account_service.delete_account(account_id)
-        if not result:
+        account_model = db_session.query(AccountModel).filter_by(account_id=account_id).first()
+        if not account_model:
             return not_found_response('Account not found')
-        
+        # 1) Doctor cascade: reviews -> reports -> messages -> conversations -> doctor_profile
+        doctor_model = db_session.query(DoctorProfileModel).filter_by(account_id=account_id).first()
+        if doctor_model:
+            doctor_id = doctor_model.doctor_id
+            db_session.query(DoctorReviewModel).filter_by(doctor_id=doctor_id).delete(synchronize_session=False)
+            db_session.query(MedicalReportModel).filter_by(doctor_id=doctor_id).delete(synchronize_session=False)
+            convs = db_session.query(ConversationModel).filter_by(doctor_id=doctor_id).all()
+            for conv in convs:
+                db_session.query(MessageModel).filter_by(conversation_id=conv.conversation_id).delete(synchronize_session=False)
+            db_session.query(ConversationModel).filter_by(doctor_id=doctor_id).delete(synchronize_session=False)
+            db_session.query(DoctorProfileModel).filter_by(doctor_id=doctor_id).delete(synchronize_session=False)
+        # 2) Patient cascade: get patient_id -> analyses (via images) -> reviews/reports/annotations/results -> analyses -> images -> conversations (patient) -> patient_profile
+        patient_model = db_session.query(PatientProfileModel).filter_by(account_id=account_id).first()
+        if patient_model:
+            patient_id = patient_model.patient_id
+            image_ids = [r.image_id for r in db_session.query(RetinalImageModel.image_id).filter_by(patient_id=patient_id).all()]
+            analysis_ids = []
+            if image_ids:
+                analysis_ids = [a.analysis_id for a in db_session.query(AiAnalysisModel.analysis_id).filter(AiAnalysisModel.image_id.in_(image_ids)).all()]
+            if analysis_ids:
+                db_session.query(DoctorReviewModel).filter(DoctorReviewModel.analysis_id.in_(analysis_ids)).delete(synchronize_session=False)
+                db_session.query(MedicalReportModel).filter(MedicalReportModel.analysis_id.in_(analysis_ids)).delete(synchronize_session=False)
+                db_session.query(AiAnnotationModel).filter(AiAnnotationModel.analysis_id.in_(analysis_ids)).delete(synchronize_session=False)
+                db_session.query(AiResultModel).filter(AiResultModel.analysis_id.in_(analysis_ids)).delete(synchronize_session=False)
+            if image_ids:
+                db_session.query(AiAnalysisModel).filter(AiAnalysisModel.image_id.in_(image_ids)).delete(synchronize_session=False)
+            db_session.query(MedicalReportModel).filter_by(patient_id=patient_id).delete(synchronize_session=False)
+            convs_p = db_session.query(ConversationModel).filter_by(patient_id=patient_id).all()
+            for conv in convs_p:
+                db_session.query(MessageModel).filter_by(conversation_id=conv.conversation_id).delete(synchronize_session=False)
+            db_session.query(ConversationModel).filter_by(patient_id=patient_id).delete(synchronize_session=False)
+            db_session.query(RetinalImageModel).filter_by(patient_id=patient_id).delete(synchronize_session=False)
+            db_session.query(PatientProfileModel).filter_by(account_id=account_id).delete(synchronize_session=False)
+        # 3) Account-level: payments (via subscriptions) -> subscriptions -> notifications -> account
+        sub_ids = [s.subscription_id for s in db_session.query(SubscriptionModel.subscription_id).filter_by(account_id=account_id).all()]
+        if sub_ids:
+            db_session.query(PaymentModel).filter(PaymentModel.subscription_id.in_(sub_ids)).delete(synchronize_session=False)
+        db_session.query(SubscriptionModel).filter_by(account_id=account_id).delete(synchronize_session=False)
+        db_session.query(NotificationModel).filter_by(account_id=account_id).delete(synchronize_session=False)
+        db_session.query(AccountModel).filter_by(account_id=account_id).delete(synchronize_session=False)
+        db_session.commit()
         return success_response(None, 'Account deleted successfully')
-        
-    except ValueError as e:
-        return error_response(str(e), 400)
     except Exception as e:
+        try:
+            db_session.rollback()
+        except Exception:
+            pass
         return error_response(f'Internal server error: {str(e)}', 500)
+    finally:
+        try:
+            db_session.remove()
+        except Exception:
+            pass
 
 
 @account_bp.route('/check-email', methods=['POST'])

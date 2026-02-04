@@ -45,3 +45,15 @@ class IAiResultRepository(ABC):
     def count_by_risk_level(self, risk_level: str) -> int:
         pass
 
+    @abstractmethod
+    def get_risk_distribution_analytics(self, days: Optional[int] = 30) -> dict:
+        """
+        Admin analytics (FR-36): risk distribution over a period.
+        Logic: per analysis, pick the worst risk_level among its ai_results, then count distribution.
+        Args:
+            days: Number of days to look back; None or 0 means all time.
+        Returns:
+            Dict with risk_distribution, risk_percentages, total_analyses, average_confidence, etc.
+        """
+        pass
+

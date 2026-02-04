@@ -11,7 +11,15 @@ from infrastructure.repositories.subscription_repository import SubscriptionRepo
 from infrastructure.repositories.medical_report_repository import MedicalReportRepository
 from infrastructure.repositories.service_package_repository import ServicePackageRepository
 from infrastructure.repositories.payment_repository import PaymentRepository
-from infrastructure.databases.mssql import session
+from infrastructure.databases.mssql import session as db_session
+from infrastructure.models.clinic_model import ClinicModel
+from infrastructure.models.account_model import AccountModel
+from infrastructure.models.imaging.retinal_image_model import RetinalImageModel
+from infrastructure.models.ai.ai_analysis_model import AiAnalysisModel
+from infrastructure.models.ai.ai_result_model import AiResultModel
+from infrastructure.models.ai.ai_annotation_model import AiAnnotationModel
+from infrastructure.models.medical.doctor_review_model import DoctorReviewModel
+from infrastructure.models.medical.medical_report_model import MedicalReportModel
 from services.clinic_service import ClinicService
 from api.responses import success_response, error_response, not_found_response, validation_error_response
 from api.schemas import ClinicCreateRequestSchema, ClinicUpdateRequestSchema, ClinicResponseSchema
@@ -19,16 +27,16 @@ from api.schemas import ClinicCreateRequestSchema, ClinicUpdateRequestSchema, Cl
 clinic_bp = Blueprint('clinic', __name__, url_prefix='/api/clinics')
 
 # Initialize repositories
-clinic_repo = ClinicRepository(session)
-account_repo = AccountRepository(session)
-patient_repo = PatientProfileRepository(session)
-doctor_repo = DoctorProfileRepository(session)
-image_repo = RetinalImageRepository(session)
-result_repo = AiResultRepository(session)
-subscription_repo = SubscriptionRepository(session)
-report_repo = MedicalReportRepository(session)
-package_repo = ServicePackageRepository(session)
-payment_repo = PaymentRepository(session)
+clinic_repo = ClinicRepository(db_session)
+account_repo = AccountRepository(db_session)
+patient_repo = PatientProfileRepository(db_session)
+doctor_repo = DoctorProfileRepository(db_session)
+image_repo = RetinalImageRepository(db_session)
+result_repo = AiResultRepository(db_session)
+subscription_repo = SubscriptionRepository(db_session)
+report_repo = MedicalReportRepository(db_session)
+package_repo = ServicePackageRepository(db_session)
+payment_repo = PaymentRepository(db_session)
 
 # Initialize SERVICE with dependency injection ✅
 clinic_service = ClinicService(
@@ -745,7 +753,9 @@ def update_clinic(clinic_id):
 @require_role('Admin')
 def delete_clinic(clinic_id):
     """
-    Delete clinic
+    Delete clinic. Cascades: for each retinal_image in clinic, delete
+    doctor_reviews/medical_reports/ai_annotations/ai_results/ai_analysis -> retinal_images,
+    then set accounts.clinic_id = NULL, then delete clinic.
     ---
     tags:
       - Clinic
@@ -764,17 +774,36 @@ def delete_clinic(clinic_id):
         description: Clinic not found
     """
     try:
-        # Call SERVICE ✅
-        result = clinic_service.delete_clinic(clinic_id)
-        if not result:
+        clinic_model = db_session.query(ClinicModel).filter_by(clinic_id=clinic_id).first()
+        if not clinic_model:
             return not_found_response('Clinic not found')
-        
+        image_ids = [r.image_id for r in db_session.query(RetinalImageModel.image_id).filter_by(clinic_id=clinic_id).all()]
+        analysis_ids = []
+        if image_ids:
+            analysis_ids = [a.analysis_id for a in db_session.query(AiAnalysisModel.analysis_id).filter(AiAnalysisModel.image_id.in_(image_ids)).all()]
+        if analysis_ids:
+            db_session.query(DoctorReviewModel).filter(DoctorReviewModel.analysis_id.in_(analysis_ids)).delete(synchronize_session=False)
+            db_session.query(MedicalReportModel).filter(MedicalReportModel.analysis_id.in_(analysis_ids)).delete(synchronize_session=False)
+            db_session.query(AiAnnotationModel).filter(AiAnnotationModel.analysis_id.in_(analysis_ids)).delete(synchronize_session=False)
+            db_session.query(AiResultModel).filter(AiResultModel.analysis_id.in_(analysis_ids)).delete(synchronize_session=False)
+        if image_ids:
+            db_session.query(AiAnalysisModel).filter(AiAnalysisModel.image_id.in_(image_ids)).delete(synchronize_session=False)
+        db_session.query(RetinalImageModel).filter_by(clinic_id=clinic_id).delete(synchronize_session=False)
+        db_session.query(AccountModel).filter_by(clinic_id=clinic_id).update({AccountModel.clinic_id: None}, synchronize_session=False)
+        db_session.query(ClinicModel).filter_by(clinic_id=clinic_id).delete(synchronize_session=False)
+        db_session.commit()
         return success_response(None, 'Clinic deleted successfully')
-        
-    except ValueError as e:
-        return error_response(str(e), 400)
     except Exception as e:
+        try:
+            db_session.rollback()
+        except Exception:
+            pass
         return error_response(f'Internal server error: {str(e)}', 500)
+    finally:
+        try:
+            db_session.remove()
+        except Exception:
+            pass
 
 
 @clinic_bp.route('/stats', methods=['GET'])

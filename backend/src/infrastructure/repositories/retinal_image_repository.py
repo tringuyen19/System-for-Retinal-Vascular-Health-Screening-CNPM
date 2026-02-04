@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -182,5 +182,65 @@ class RetinalImageRepository(IRetinalImageRepository):
             return self.session.query(RetinalImageModel).filter_by(status=status).count()
         except Exception as e:
             raise ValueError(f'Error counting images by status: {str(e)}')
+        finally:
+            self.session.close()
+
+    def get_image_analytics(self, days: Optional[int] = 30) -> Dict[str, Any]:
+        """
+        FR-36: Image analytics over a period.
+        - days: None or 0 => all time
+        Returns:
+          {
+            period_days, period_label, total_images,
+            type_distribution, status_distribution,
+            daily_upload_trend: [{date, count}]
+          }
+        """
+        try:
+            from datetime import timedelta
+
+            end_dt = datetime.now()
+            start_dt = None
+            if days not in (None, 0):
+                start_dt = end_dt - timedelta(days=int(days))
+
+            q = self.session.query(
+                RetinalImageModel.upload_time,
+                RetinalImageModel.image_type,
+                RetinalImageModel.status,
+            )
+            if start_dt is not None:
+                q = q.filter(RetinalImageModel.upload_time >= start_dt).filter(RetinalImageModel.upload_time <= end_dt)
+
+            rows = q.all()
+
+            type_distribution: Dict[str, int] = {}
+            status_distribution: Dict[str, int] = {}
+            daily: Dict[str, int] = {}
+
+            for upload_time, image_type, status in rows:
+                it = (image_type or 'unknown').strip().lower()
+                st = (status or 'unknown').strip().lower()
+                type_distribution[it] = type_distribution.get(it, 0) + 1
+                status_distribution[st] = status_distribution.get(st, 0) + 1
+
+                if upload_time:
+                    dk = upload_time.date().isoformat()
+                    daily[dk] = daily.get(dk, 0) + 1
+
+            daily_upload_trend = [{'date': d, 'count': daily[d]} for d in sorted(daily.keys())]
+
+            period_label = 'Tất cả thời gian' if days in (None, 0) else f'Trong {int(days)} ngày gần đây'
+            return {
+                'period_days': None if days in (None, 0) else int(days),
+                'period_label': period_label,
+                'total_images': len(rows),
+                'type_distribution': type_distribution,
+                'status_distribution': status_distribution,
+                'daily_upload_trend': daily_upload_trend,
+                'has_data': len(rows) > 0
+            }
+        except Exception as e:
+            raise ValueError(f'Error getting image analytics: {str(e)}')
         finally:
             self.session.close()

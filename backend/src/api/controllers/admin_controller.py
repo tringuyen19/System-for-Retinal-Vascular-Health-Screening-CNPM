@@ -165,8 +165,12 @@ def get_image_analytics():
         description: Image analytics retrieved successfully
     """
     try:
-        days = request.args.get('days', 30, type=int)
-        analytics = admin_service.get_image_analytics(days=days)
+        days_param = request.args.get('days', '30')
+        if days_param in ['all', '0', '']:
+            days = None
+        else:
+            days = int(days_param) if days_param else 30
+        analytics = admin_service.get_image_analytics(days=days or 0)
         return success_response(analytics, "Image analytics retrieved successfully")
     except Exception as e:
         return error_response(f'Internal server error: {str(e)}', 500)
@@ -187,7 +191,12 @@ def get_risk_distribution_analytics():
         description: Risk distribution analytics retrieved successfully
     """
     try:
-        analytics = admin_service.get_risk_distribution_analytics()
+        days_param = request.args.get('days', '30')
+        if days_param in ['all', '0', '']:
+            days = None
+        else:
+            days = int(days_param) if days_param else 30
+        analytics = admin_service.get_risk_distribution_analytics(days=days or 0)
         return success_response(analytics, "Risk distribution analytics retrieved successfully")
     except Exception as e:
         return error_response(f'Internal server error: {str(e)}', 500)
@@ -244,7 +253,12 @@ def get_error_rate_analytics():
         description: Error rate analytics retrieved successfully
     """
     try:
-        analytics = admin_service.get_error_rate_analytics()
+        days_param = request.args.get('days', '30')
+        if days_param in ['all', '0', '']:
+            days = None
+        else:
+            days = int(days_param) if days_param else 30
+        analytics = admin_service.get_error_rate_analytics(days=days or 0)
         return success_response(analytics, "Error rate analytics retrieved successfully")
     except Exception as e:
         return error_response(f'Internal server error: {str(e)}', 500)

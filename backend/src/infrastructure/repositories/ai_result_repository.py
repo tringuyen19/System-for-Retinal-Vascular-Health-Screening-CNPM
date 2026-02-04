@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -229,5 +229,89 @@ class AiResultRepository(IAiResultRepository):
             return self.session.query(AiResultModel).filter_by(risk_level=risk_level).count()
         except Exception as e:
             raise ValueError(f'Error counting results by risk level: {str(e)}')
+        finally:
+            self.session.close()
+
+    def get_risk_distribution_analytics(self, days: Optional[int] = 30) -> Dict[str, Any]:
+        """
+        FR-36: Risk distribution analytics over a period.
+        Logic: for each analysis, pick the worst risk among its results, then count distribution.
+        - days: None or 0 => all time
+        """
+        try:
+            from datetime import datetime, timedelta
+
+            risk_order = {'low': 1, 'medium': 2, 'high': 3, 'critical': 4}
+
+            end_dt = datetime.now()
+            start_dt = None
+            if days not in (None, 0):
+                start_dt = end_dt - timedelta(days=int(days))
+
+            q = (
+                self.session.query(
+                    AiResultModel.analysis_id,
+                    AiResultModel.risk_level,
+                    AiResultModel.confidence_score,
+                )
+                .join(AiAnalysisModel, AiResultModel.analysis_id == AiAnalysisModel.analysis_id)
+                .filter(AiAnalysisModel.status == 'completed')
+            )
+            if start_dt is not None:
+                q = q.filter(AiAnalysisModel.analysis_time >= start_dt).filter(AiAnalysisModel.analysis_time <= end_dt)
+
+            rows = q.all()
+
+            # Per analysis aggregation
+            worst_by_analysis: Dict[int, str] = {}
+            confidence_scores: List[float] = []
+
+            for analysis_id, risk_level, confidence_score in rows:
+                rl = (risk_level or 'unknown').strip().lower()
+                if rl not in risk_order:
+                    rl = 'unknown'
+
+                if analysis_id is not None:
+                    prev = worst_by_analysis.get(int(analysis_id))
+                    if prev is None:
+                        worst_by_analysis[int(analysis_id)] = rl
+                    else:
+                        if risk_order.get(rl, 0) > risk_order.get(prev, 0):
+                            worst_by_analysis[int(analysis_id)] = rl
+
+                if confidence_score is not None:
+                    try:
+                        confidence_scores.append(float(confidence_score))
+                    except Exception:
+                        pass
+
+            dist: Dict[str, int] = {'low': 0, 'medium': 0, 'high': 0, 'critical': 0, 'unknown': 0}
+            for rl in worst_by_analysis.values():
+                dist[rl] = dist.get(rl, 0) + 1
+
+            total_analyses = len(worst_by_analysis)
+            percentages = {
+                k: round((v / total_analyses * 100.0), 2) if total_analyses > 0 else 0.0
+                for k, v in dist.items()
+            }
+
+            avg_conf = (sum(confidence_scores) / len(confidence_scores)) if confidence_scores else 0.0
+            min_conf = min(confidence_scores) if confidence_scores else 0.0
+            max_conf = max(confidence_scores) if confidence_scores else 0.0
+
+            period_label = 'Tất cả thời gian' if days in (None, 0) else f'Trong {int(days)} ngày gần đây'
+            return {
+                'period_days': None if days in (None, 0) else int(days),
+                'period_label': period_label,
+                'risk_distribution': dist,
+                'risk_percentages': percentages,
+                'total_analyses': total_analyses,
+                'average_confidence': round(avg_conf, 2),
+                'min_confidence': round(min_conf, 2),
+                'max_confidence': round(max_conf, 2),
+                'has_data': total_analyses > 0
+            }
+        except Exception as e:
+            raise ValueError(f'Error getting risk distribution analytics: {str(e)}')
         finally:
             self.session.close()

@@ -78,3 +78,14 @@ class IAiAnalysisRepository(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_error_rate_analytics(self, days: Optional[int] = 30) -> dict:
+        """
+        Admin analytics (FR-36): error rate + status breakdown over a period.
+        Args:
+            days: Number of days to look back; None or 0 means all time.
+        Returns:
+            Dict with total_analyses, failed_analyses, error_rate, status_breakdown, daily_failure_trend, etc.
+        """
+        pass
+
