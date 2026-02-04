@@ -42,6 +42,7 @@
         <a class="nav-link rounded mb-1" href="clinics.html"><i class="bi bi-building me-2"></i>Phòng khám</a>
         <a class="nav-link rounded mb-1" href="ai-models.html"><i class="bi bi-cpu me-2"></i>AI Models</a>
         <a class="nav-link rounded mb-1" href="statistics.html"><i class="bi bi-graph-up me-2"></i>Thống kê</a>
+        <a class="nav-link rounded mb-1" href="billing.html"><i class="bi bi-cash-coin me-2"></i>Gói &amp; Thanh toán</a>
         <hr class="my-2">
         <a class="nav-link rounded mb-1 active" href="settings.html"><i class="bi bi-gear me-2"></i>Cài đặt hệ thống</a>
       </nav>
@@ -139,8 +140,20 @@
             <div class="card border-0 shadow-sm">
               <div class="card-header bg-white"><h5 class="mb-0">Chính sách thông báo</h5></div>
               <div class="card-body">
-                <p class="text-muted small">Danh sách chính sách thông báo (xem / sửa từ API). Hiển thị dữ liệu đọc được.</p>
-                <pre id="policiesJson" class="bg-light p-3 rounded small" style="max-height: 300px; overflow: auto;">Đang tải...</pre>
+                <div class="row g-3">
+                  <div class="col-md-7">
+                    <p class="text-muted small mb-2">
+                      Cấu hình <strong>chính sách truyền thông</strong> cho từng loại sự kiện (bật/tắt, kênh, đối tượng nhận, mức ưu tiên).
+                    </p>
+                    <div id="policiesTable" class="small"></div>
+                  </div>
+                  <div class="col-md-5">
+                    <p class="text-muted small mb-2">
+                      <strong>Mẫu thông báo</strong> hiện có (theo loại). Hệ thống sẽ dùng mẫu đang <span class="badge bg-success">được kích hoạt</span>.
+                    </p>
+                    <div id="templatesTable" class="small"></div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

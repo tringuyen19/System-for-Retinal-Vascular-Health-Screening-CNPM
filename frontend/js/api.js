@@ -153,9 +153,21 @@
     return res.data;
   }
 
+  /** Admin/Doctor: danh sách tất cả bệnh nhân (GET /api/patients) */
+  async function getAllPatients() {
+    const res = await request('GET', '/api/patients');
+    return res.data;
+  }
+
   /** Patient: chi tiết bệnh nhân theo id (GET /api/patients/:id) - Doctor/Admin */
   async function getPatient(patientId) {
     const res = await request('GET', '/api/patients/' + patientId);
+    return res.data;
+  }
+
+  /** Admin/Doctor: danh sách tất cả bác sĩ (GET /api/doctors) */
+  async function getAllDoctors() {
+    const res = await request('GET', '/api/doctors');
     return res.data;
   }
 
@@ -515,13 +527,79 @@
 
   /** Service packages: danh sách gói cho patient (ids 1-5) - FR-11 */
   async function getServicePackagesForPatient() {
-    const res = await request('GET', '/api/service-packages?ids=1,2,3,4,5');
-    return res.data;
+    // FR-34: prefer type+active filter; fallback to legacy ids for older DBs
+    try {
+      const res = await request('GET', '/api/service-packages?type=patient&active=1');
+      if (res && res.data && Array.isArray(res.data.packages) && res.data.packages.length) return res.data;
+    } catch (e) { /* fallback below */ }
+    const legacy = await request('GET', '/api/service-packages?ids=1,2,3,4,5');
+    return legacy.data;
   }
 
   /** Service packages: danh sách gói cấp phòng khám (ids 6,7,8) - FR-28 */
   async function getServicePackagesForClinic() {
-    const res = await request('GET', '/api/service-packages?ids=6,7,8');
+    // FR-34: prefer type+active filter; fallback to legacy ids for older DBs
+    try {
+      const res = await request('GET', '/api/service-packages?type=clinic&active=1');
+      if (res && res.data && Array.isArray(res.data.packages) && res.data.packages.length) return res.data;
+    } catch (e) { /* fallback below */ }
+    const legacy = await request('GET', '/api/service-packages?ids=6,7,8');
+    return legacy.data;
+  }
+
+  // ---------- Admin: Billing (FR-34) ----------
+  async function adminListServicePackages(opts) {
+    opts = opts || {};
+    const q = [];
+    if (opts.type) q.push('type=' + encodeURIComponent(opts.type));
+    if (opts.active != null) q.push('active=' + (opts.active ? '1' : '0'));
+    const path = '/api/service-packages' + (q.length ? ('?' + q.join('&')) : '');
+    const res = await request('GET', path);
+    return res.data;
+  }
+
+  async function adminCreateServicePackage(payload) {
+    const res = await request('POST', '/api/service-packages', payload);
+    return res.data;
+  }
+
+  async function adminUpdateServicePackage(packageId, payload) {
+    const res = await request('PUT', '/api/service-packages/' + packageId, payload);
+    return res.data;
+  }
+
+  async function adminDeleteServicePackage(packageId) {
+    const res = await request('DELETE', '/api/service-packages/' + packageId);
+    return res.data;
+  }
+
+  async function adminListPayments(opts) {
+    opts = opts || {};
+    if (opts.status) {
+      const res = await request('GET', '/api/payments/status/' + encodeURIComponent(opts.status));
+      return res.data;
+    }
+    let path = '/api/payments';
+    const q = [];
+    if (opts.start_date) q.push('start_date=' + encodeURIComponent(opts.start_date));
+    if (opts.end_date) q.push('end_date=' + encodeURIComponent(opts.end_date));
+    if (q.length) path += '?' + q.join('&');
+    const res = await request('GET', path);
+    return res.data;
+  }
+
+  async function adminCompletePayment(paymentId) {
+    const res = await request('PUT', '/api/payments/' + paymentId + '/complete', {});
+    return res.data;
+  }
+
+  async function adminFailPayment(paymentId) {
+    const res = await request('PUT', '/api/payments/' + paymentId + '/fail', {});
+    return res.data;
+  }
+
+  async function adminRefundPayment(paymentId) {
+    const res = await request('PUT', '/api/payments/' + paymentId + '/refund', {});
     return res.data;
   }
 
@@ -602,9 +680,9 @@
     return res.data;
   }
 
-  /** Admin: đổi mật khẩu tài khoản (PUT /api/accounts/:id/password) body: { new_password_hash } */
-  async function updateAccountPassword(accountId, newPasswordHash) {
-    const res = await request('PUT', '/api/accounts/' + accountId + '/password', { new_password_hash: newPasswordHash });
+  /** Admin: đổi mật khẩu tài khoản (PUT /api/accounts/:id/password) body: { new_password } - plain text, backend sẽ hash */
+  async function updateAccountPassword(accountId, newPassword) {
+    const res = await request('PUT', '/api/accounts/' + accountId + '/password', { new_password: newPassword });
     return res.data;
   }
 
@@ -769,14 +847,16 @@
   /** Admin: analytics ảnh (GET /api/admin/analytics/images?days=) */
   async function getAdminImageAnalytics(days) {
     let path = '/api/admin/analytics/images';
-    if (days != null) path += '?days=' + days;
+    if (days != null && days !== '') path += '?days=' + (days === 'all' ? '0' : days);
     const res = await request('GET', path);
     return res.data;
   }
 
   /** Admin: analytics phân bố rủi ro (GET /api/admin/analytics/risk-distribution) */
-  async function getAdminRiskDistribution() {
-    const res = await request('GET', '/api/admin/analytics/risk-distribution');
+  async function getAdminRiskDistribution(days) {
+    let path = '/api/admin/analytics/risk-distribution';
+    if (days != null && days !== '') path += '?days=' + (days === 'all' ? '0' : days);
+    const res = await request('GET', path);
     return res.data;
   }
 
@@ -789,8 +869,10 @@
   }
 
   /** Admin: analytics tỷ lệ lỗi (GET /api/admin/analytics/error-rates) */
-  async function getAdminErrorRateAnalytics() {
-    const res = await request('GET', '/api/admin/analytics/error-rates');
+  async function getAdminErrorRateAnalytics(days) {
+    let path = '/api/admin/analytics/error-rates';
+    if (days != null && days !== '') path += '?days=' + (days === 'all' ? '0' : days);
+    const res = await request('GET', path);
     return res.data;
   }
 
@@ -830,6 +912,27 @@
     return res.data;
   }
 
+  // ---------- Admin: Notification Templates (FR-39) ----------
+  /** Admin: danh sách mẫu thông báo (GET /api/admin/notification-templates) */
+  async function adminListNotificationTemplates(includeInactive) {
+    let path = '/api/admin/notification-templates';
+    if (includeInactive) path += '?include_inactive=true';
+    const res = await request('GET', path);
+    return res.data;
+  }
+
+  /** Admin: kích hoạt mẫu (PUT /api/admin/notification-templates/:id/activate) */
+  async function adminActivateNotificationTemplate(templateId) {
+    const res = await request('PUT', '/api/admin/notification-templates/' + templateId + '/activate', {});
+    return res.data;
+  }
+
+  /** Admin: tắt mẫu (PUT /api/admin/notification-templates/:id/deactivate) */
+  async function adminDeactivateNotificationTemplate(templateId) {
+    const res = await request('PUT', '/api/admin/notification-templates/' + templateId + '/deactivate', {});
+    return res.data;
+  }
+
   window.AuraAPI = {
     get: (path) => request('GET', path),
     post: (path, body) => request('POST', path, body),
@@ -850,6 +953,8 @@
     createPatient,
     updatePatient,
     getPatient,
+    getAllPatients,
+    getAllDoctors,
     getDoctorByAccount,
     getDoctorPerformance,
     getDoctorPatients,
@@ -901,6 +1006,14 @@
     purchasePackageDemo,
     getServicePackagesForPatient,
     getServicePackagesForClinic,
+    adminListServicePackages,
+    adminCreateServicePackage,
+    adminUpdateServicePackage,
+    adminDeleteServicePackage,
+    adminListPayments,
+    adminCompletePayment,
+    adminFailPayment,
+    adminRefundPayment,
     purchaseClinicPackageDemo,
     renewSubscription,
     getPaymentHistory,
@@ -947,5 +1060,8 @@
     updateAdminPrivacySettings,
     getAdminCommunicationPolicies,
     updateAdminCommunicationPolicy,
+    adminListNotificationTemplates,
+    adminActivateNotificationTemplate,
+    adminDeactivateNotificationTemplate,
   };
 })();

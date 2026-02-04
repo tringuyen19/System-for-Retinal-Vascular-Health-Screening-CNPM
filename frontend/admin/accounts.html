@@ -42,6 +42,7 @@
         <a class="nav-link rounded mb-1" href="clinics.html"><i class="bi bi-building me-2"></i>Phòng khám</a>
         <a class="nav-link rounded mb-1" href="ai-models.html"><i class="bi bi-cpu me-2"></i>AI Models</a>
         <a class="nav-link rounded mb-1" href="statistics.html"><i class="bi bi-graph-up me-2"></i>Thống kê</a>
+        <a class="nav-link rounded mb-1" href="billing.html"><i class="bi bi-cash-coin me-2"></i>Gói &amp; Thanh toán</a>
         <hr class="my-2">
         <a class="nav-link rounded mb-1" href="settings.html"><i class="bi bi-gear me-2"></i>Cài đặt hệ thống</a>
       </nav>
@@ -50,6 +51,7 @@
     <main class="flex-grow-1 p-4" style="background-color: #f5f5f5;">
       <div class="container-fluid">
         <h1 class="h3 mb-4">Quản lý tài khoản</h1>
+        <p class="text-muted small mb-3">Quản lý tài khoản người dùng, bác sĩ và quản lý phòng khám.</p>
         <div id="pageError" class="alert alert-danger d-none"></div>
         <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
           <select id="filterRole" class="form-select form-select-sm" style="width: auto;">
@@ -57,10 +59,11 @@
           </select>
           <select id="filterStatus" class="form-select form-select-sm" style="width: auto;">
             <option value="">Tất cả trạng thái</option>
-            <option value="active">active</option>
-            <option value="inactive">inactive</option>
-            <option value="suspended">suspended</option>
+            <option value="active">Hoạt động</option>
+            <option value="inactive">Không hoạt động</option>
+            <option value="suspended">Đình chỉ</option>
           </select>
+          <input type="text" id="filterSearch" class="form-control form-control-sm" placeholder="Tìm email..." style="width: 180px;">
           <button type="button" class="btn btn-primary btn-sm" id="btnReload"><i class="bi bi-arrow-clockwise me-1"></i>Tải lại</button>
           <button type="button" class="btn btn-success btn-sm" id="btnCreate"><i class="bi bi-plus-lg me-1"></i>Tạo tài khoản</button>
         </div>
@@ -74,12 +77,13 @@
                     <th>Email</th>
                     <th>Vai trò</th>
                     <th>Trạng thái</th>
-                    <th>Clinic ID</th>
+                    <th>Thông tin thêm</th>
+                    <th>Ngày tạo</th>
                     <th>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody id="accountsTableBody">
-                  <tr><td colspan="6" class="text-center text-muted">Đang tải...</td></tr>
+                  <tr><td colspan="7" class="text-center text-muted">Đang tải...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -99,33 +103,143 @@
         <div class="modal-body">
           <input type="hidden" id="accountId" value="">
           <div class="mb-2">
-            <label class="form-label">Email</label>
-            <input type="email" class="form-control" id="accountEmail" placeholder="user@example.com">
+            <label class="form-label">Email <span class="text-danger">*</span></label>
+            <input type="email" class="form-control" id="accountEmail" placeholder="user@example.com" required>
           </div>
           <div class="mb-2" id="wrapPassword">
-            <label class="form-label">Mật khẩu</label>
-            <input type="password" class="form-control" id="accountPassword" placeholder="Chỉ điền khi đổi mật khẩu">
+            <label class="form-label" id="labelPassword">Mật khẩu <span class="text-danger">*</span></label>
+            <input type="password" class="form-control" id="accountPassword" placeholder="Tối thiểu 6 ký tự" minlength="6" autocomplete="new-password">
           </div>
           <div class="mb-2">
-            <label class="form-label">Vai trò</label>
-            <select class="form-select" id="accountRoleId"></select>
+            <label class="form-label">Vai trò <span class="text-danger">*</span></label>
+            <select class="form-select" id="accountRoleId" required></select>
           </div>
-          <div class="mb-2">
-            <label class="form-label">Clinic ID (tùy chọn)</label>
-            <input type="number" class="form-control" id="accountClinicId" placeholder="">
+          <div class="mb-2" id="wrapClinic">
+            <label class="form-label">Phòng khám</label>
+            <select class="form-select" id="accountClinicId">
+              <option value="">-- Chọn phòng khám (Doctor/Bệnh nhân - tùy chọn) --</option>
+            </select>
+          </div>
+          <div class="border rounded p-3 mb-2 d-none" id="wrapClinicCreate">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <strong><i class="bi bi-building me-1"></i>Tạo phòng khám mới</strong>
+              <span class="badge bg-warning text-dark">pending</span>
+            </div>
+            <p class="text-muted small mb-2">Khi tạo role Quản lý phòng khám, hệ thống sẽ tạo <strong>clinic mới</strong> và gán tài khoản email/mật khẩu ở trên làm <strong>manager</strong>.</p>
+            <div class="mb-2">
+              <label class="form-label">Tên phòng khám <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="newClinicName" placeholder="VD: City Eye Clinic">
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Địa chỉ <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="newClinicAddress" placeholder="VD: 123 Main Street">
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Số điện thoại <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="newClinicPhone" placeholder="VD: 090xxxxxxx">
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Logo URL</label>
+              <input type="text" class="form-control" id="newClinicLogoUrl" placeholder="https://... (tùy chọn)">
+            </div>
+            <div class="row g-2">
+              <div class="col-md-6">
+                <label class="form-label">Số giấy phép</label>
+                <input type="text" class="form-control" id="newClinicLicenseNumber" placeholder="LIC-... (tùy chọn)">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Mã số thuế</label>
+                <input type="text" class="form-control" id="newClinicTaxId" placeholder="TAX-... (tùy chọn)">
+              </div>
+            </div>
+            <div class="mt-2">
+              <label class="form-label">Tài liệu xác minh (mỗi dòng 1 URL)</label>
+              <textarea class="form-control" id="newClinicVerificationDocs" rows="2" placeholder="https://...&#10;https://... (tùy chọn)"></textarea>
+            </div>
           </div>
           <div class="mb-2" id="wrapStatus">
             <label class="form-label">Trạng thái</label>
             <select class="form-select" id="accountStatus">
-              <option value="active">active</option>
-              <option value="inactive">inactive</option>
-              <option value="suspended">suspended</option>
+              <option value="active">Hoạt động</option>
+              <option value="inactive">Không hoạt động</option>
+              <option value="suspended">Đình chỉ</option>
             </select>
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
           <button type="button" class="btn btn-primary" id="btnSaveAccount">Lưu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalDoctorProfile" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Tạo hồ sơ bác sĩ</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="doctorProfileAccountId" value="">
+          <p class="text-muted small mb-2">Tài khoản đã có vai trò Bác sĩ. Điền thông tin hồ sơ bác sĩ.</p>
+          <div class="mb-2">
+            <label class="form-label">Họ tên bác sĩ <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="doctorName" placeholder="VD: Nguyễn Văn A">
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Chuyên khoa <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="doctorSpecialization" placeholder="VD: Nhãn khoa">
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Số chứng chỉ hành nghề <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="doctorLicense" placeholder="VD: BYT-12345">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+          <button type="button" class="btn btn-primary" id="btnSaveDoctorProfile">Lưu hồ sơ</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalPatientProfile" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Tạo hồ sơ bệnh nhân</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="patientProfileAccountId" value="">
+          <p class="text-muted small mb-2">Tài khoản đã có vai trò Bệnh nhân. Điền thông tin hồ sơ bệnh nhân.</p>
+          <div class="mb-2">
+            <label class="form-label">Họ tên bệnh nhân <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="patientName" placeholder="VD: Nguyễn Văn A">
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Ngày sinh</label>
+            <input type="date" class="form-control" id="patientDob">
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Giới tính</label>
+            <select class="form-select" id="patientGender">
+              <option value="">-- Chọn --</option>
+              <option value="male">Nam</option>
+              <option value="female">Nữ</option>
+              <option value="other">Khác</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Tiền sử bệnh</label>
+            <textarea class="form-control" id="patientMedicalHistory" rows="3" placeholder="Tùy chọn"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+          <button type="button" class="btn btn-primary" id="btnSavePatientProfile">Lưu hồ sơ</button>
         </div>
       </div>
     </div>

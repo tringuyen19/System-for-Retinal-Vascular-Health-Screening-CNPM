@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gói dịch vụ & Thanh toán | AURA Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="../css/style.css" rel="stylesheet">
+  <style>
+    /* FR-34 UI: keep action buttons on one line */
+    .aura-table-actions { white-space: nowrap; }
+    .aura-col-money { white-space: nowrap; }
+    .aura-col-name { min-width: 260px; }
+    .aura-toolbar .form-select,
+    .aura-toolbar .form-control { min-width: 180px; }
+  </style>
+</head>
+<body class="d-flex flex-column min-vh-100 aura-fixed-header">
+  <header class="aura-header navbar navbar-expand-lg navbar-dark fixed-top" style="background-color: #212121;">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="../index.html">AURA</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain"><span class="navbar-toggler-icon"></span></button>
+      <div class="collapse navbar-collapse" id="navbarMain">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item"><a class="nav-link" href="../index.html">Trang chủ</a></li>
+          <li class="nav-item"><a class="nav-link" href="../login.html">Đăng nhập</a></li>
+        </ul>
+        <ul class="navbar-nav ms-auto align-items-center">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown"><i class="bi bi-person-circle me-1"></i><span id="headerUserName">Admin</span></a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="dashboard.html">Dashboard</a></li>
+              <li><a class="dropdown-item" href="settings.html">Cài đặt hệ thống</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item text-danger" href="#" id="headerLogout">Đăng xuất</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </header>
+
+  <div class="d-flex flex-grow-1" style="padding-top: 56px;">
+    <aside class="aura-sidebar d-none d-md-flex flex-shrink-0 border-end bg-light" style="width: 250px; background-color: #f5f5f5 !important;">
+      <nav class="nav flex-column p-3 w-100">
+        <span class="text-muted small text-uppercase px-3 mb-2">Quản trị</span>
+        <a class="nav-link rounded mb-1" href="dashboard.html"><i class="bi bi-house-door me-2"></i>Dashboard</a>
+        <a class="nav-link rounded mb-1" href="accounts.html"><i class="bi bi-people me-2"></i>Tài khoản</a>
+        <a class="nav-link rounded mb-1" href="clinics.html"><i class="bi bi-building me-2"></i>Phòng khám</a>
+        <a class="nav-link rounded mb-1" href="ai-models.html"><i class="bi bi-cpu me-2"></i>AI Models</a>
+        <a class="nav-link rounded mb-1" href="statistics.html"><i class="bi bi-graph-up me-2"></i>Thống kê</a>
+        <a class="nav-link rounded mb-1 active" href="billing.html"><i class="bi bi-cash-coin me-2"></i>Gói &amp; Thanh toán</a>
+        <hr class="my-2">
+        <a class="nav-link rounded mb-1" href="settings.html"><i class="bi bi-gear me-2"></i>Cài đặt hệ thống</a>
+      </nav>
+    </aside>
+
+    <main class="flex-grow-1 p-4" style="background-color: #f5f5f5;">
+      <div class="container-fluid">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h1 class="h3 mb-0">Gói dịch vụ &amp; Thanh toán</h1>
+        </div>
+
+        <div id="pageError" class="alert alert-danger d-none"></div>
+
+        <ul class="nav nav-tabs mb-3" id="billingTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-packages" data-bs-toggle="tab" data-bs-target="#panel-packages" type="button">Gói dịch vụ</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-payments" data-bs-toggle="tab" data-bs-target="#panel-payments" type="button">Thanh toán</button>
+          </li>
+        </ul>
+
+        <div class="tab-content">
+          <!-- Packages -->
+          <div class="tab-pane fade show active" id="panel-packages" role="tabpanel">
+            <div class="card border-0 shadow-sm mb-3">
+              <div class="card-header bg-white">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <strong>Danh sách gói</strong>
+                    <span class="badge text-bg-light" id="packagesCount">0</span>
+                  </div>
+                  <div class="d-flex align-items-center gap-2 aura-toolbar">
+                    <select class="form-select form-select-sm" id="filterPackageType" aria-label="Loại gói">
+                      <option value="">Tất cả loại</option>
+                      <option value="patient">Bệnh nhân</option>
+                      <option value="clinic">Phòng khám</option>
+                    </select>
+                    <select class="form-select form-select-sm" id="filterPackageActive" aria-label="Trạng thái">
+                      <option value="">Tất cả trạng thái</option>
+                      <option value="1">Đang bán</option>
+                      <option value="0">Tạm ngưng</option>
+                    </select>
+                    <button class="btn btn-outline-secondary btn-sm" id="btnReloadPackages" title="Tải lại">
+                      <i class="bi bi-arrow-repeat"></i>
+                    </button>
+                    <button class="btn btn-primary btn-sm" id="btnNewPackage"><i class="bi bi-plus-lg me-1"></i>Tạo gói</button>
+                  </div>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle table-hover">
+                    <thead>
+                      <tr>
+                        <th style="width: 70px;">ID</th>
+                        <th class="aura-col-name">Tên gói</th>
+                        <th style="width: 120px;">Loại</th>
+                        <th style="width: 140px;" class="text-end aura-col-money">Giá</th>
+                        <th style="width: 130px;" class="text-end">Lượt ảnh</th>
+                        <th style="width: 120px;" class="text-end">Thời hạn</th>
+                        <th style="width: 120px;">Trạng thái</th>
+                        <th style="width: 140px;" class="text-end">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody id="packagesTbody">
+                      <tr><td colspan="8" class="text-muted">Đang tải...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Payments -->
+          <div class="tab-pane fade" id="panel-payments" role="tabpanel">
+            <div class="card border-0 shadow-sm">
+              <div class="card-header bg-white">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <strong>Thanh toán</strong>
+                    <span class="badge text-bg-light" id="paymentsCount">0</span>
+                  </div>
+                  <div class="d-flex align-items-center gap-2 aura-toolbar">
+                    <select class="form-select form-select-sm" id="filterPaymentStatus" aria-label="Trạng thái payment">
+                      <option value="">Tất cả trạng thái</option>
+                      <option value="pending">pending</option>
+                      <option value="completed">completed</option>
+                      <option value="failed">failed</option>
+                      <option value="refunded">refunded</option>
+                    </select>
+                    <button class="btn btn-outline-secondary btn-sm" id="btnReloadPayments" title="Tải lại">
+                      <i class="bi bi-arrow-repeat"></i>
+                    </button>
+                  </div>
+                </div>
+                <div class="small text-muted mt-1">
+                  Duyệt thanh toán: <span class="text-nowrap">pending → completed/failed</span>, <span class="text-nowrap">completed → refunded</span>.
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle table-hover">
+                    <thead>
+                      <tr>
+                        <th style="width: 90px;">Payment</th>
+                        <th style="width: 110px;">Sub</th>
+                        <th style="width: 160px;">Method</th>
+                        <th style="width: 180px;">Time</th>
+                        <th style="width: 140px;" class="text-end aura-col-money">Amount</th>
+                        <th style="width: 110px;">Status</th>
+                        <th style="width: 140px;" class="text-end">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody id="paymentsTbody">
+                      <tr><td colspan="7" class="text-muted">Đang tải...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Package modal -->
+  <div class="modal fade" id="packageModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="packageModalTitle">Tạo gói</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-danger d-none" id="packageModalError"></div>
+          <input type="hidden" id="packageId">
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label">Tên gói <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="packageName" placeholder="VD: Gói Premium">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Loại <span class="text-danger">*</span></label>
+              <select class="form-select" id="packageType">
+                <option value="patient">Bệnh nhân</option>
+                <option value="clinic">Phòng khám</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Trạng thái</label>
+              <div class="form-check form-switch mt-2">
+                <input class="form-check-input" type="checkbox" id="packageActive" checked>
+                <label class="form-check-label" for="packageActive">Đang bán</label>
+              </div>
+            </div>
+          </div>
+          <div class="row g-2 mt-1">
+            <div class="col-md-4">
+              <label class="form-label">Giá (VND) <span class="text-danger">*</span></label>
+              <input type="number" class="form-control" id="packagePrice" placeholder="99000" min="0" step="1000">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Lượt ảnh <span class="text-danger">*</span></label>
+              <input type="number" class="form-control" id="packageImageLimit" placeholder="100" min="0" step="1">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Thời hạn (ngày) <span class="text-danger">*</span></label>
+              <input type="number" class="form-control" id="packageDurationDays" placeholder="30" min="1" step="1">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Đóng</button>
+          <button type="button" class="btn btn-primary" id="btnSavePackage"><i class="bi bi-save me-1"></i>Lưu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="aura-footer py-3 border-top" style="background-color: #f5f5f5;">
+    <div class="container-fluid"><span class="text-muted small">&copy; 2025 AURA</span></div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/components/header.js"></script>
+  <script src="../js/components/sidebar.js"></script>
+  <script src="../js/components/alert.js"></script>
+  <script src="../js/pages/admin-billing.js"></script>
+</body>
+</html>
+

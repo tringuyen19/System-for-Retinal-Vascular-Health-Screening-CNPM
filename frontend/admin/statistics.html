@@ -42,6 +42,7 @@
         <a class="nav-link rounded mb-1" href="clinics.html"><i class="bi bi-building me-2"></i>Phòng khám</a>
         <a class="nav-link rounded mb-1" href="ai-models.html"><i class="bi bi-cpu me-2"></i>AI Models</a>
         <a class="nav-link rounded mb-1 active" href="statistics.html"><i class="bi bi-graph-up me-2"></i>Thống kê</a>
+        <a class="nav-link rounded mb-1" href="billing.html"><i class="bi bi-cash-coin me-2"></i>Gói &amp; Thanh toán</a>
         <hr class="my-2">
         <a class="nav-link rounded mb-1" href="settings.html"><i class="bi bi-gear me-2"></i>Cài đặt hệ thống</a>
       </nav>
@@ -61,11 +62,49 @@
           </select>
         </div>
         <div class="row g-3 mb-4">
+          <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-body">
+                <div class="text-muted small">Tổng ảnh</div>
+                <div class="fs-4 fw-semibold" id="statTotalImages">-</div>
+                <div class="text-muted small" id="statImagesLabel">-</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-body">
+                <div class="text-muted small">Tổng phân tích</div>
+                <div class="fs-4 fw-semibold" id="statTotalAnalyses">-</div>
+                <div class="text-muted small" id="statAnalysesLabel">-</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-body">
+                <div class="text-muted small">Tỷ lệ lỗi</div>
+                <div class="fs-4 fw-semibold" id="statErrorRate">-</div>
+                <div class="text-muted small" id="statFailedAnalyses">-</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-body">
+                <div class="text-muted small">Ca nguy cơ cao</div>
+                <div class="fs-4 fw-semibold" id="statHighCritical">-</div>
+                <div class="text-muted small" id="statRiskLabel">-</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="row g-3 mb-4">
           <div class="col-md-6">
             <div class="card border-0 shadow-sm">
               <div class="card-header bg-white"><h5 class="mb-0">Analytics ảnh</h5></div>
               <div class="card-body">
-                <pre id="imageAnalytics" class="mb-0 small bg-light p-3 rounded" style="max-height: 200px; overflow: auto;">Đang tải...</pre>
+                <div id="imageAnalytics" class="small"></div>
               </div>
             </div>
           </div>
@@ -73,7 +112,7 @@
             <div class="card border-0 shadow-sm">
               <div class="card-header bg-white"><h5 class="mb-0">Phân bố rủi ro</h5></div>
               <div class="card-body">
-                <pre id="riskDistribution" class="mb-0 small bg-light p-3 rounded" style="max-height: 200px; overflow: auto;">Đang tải...</pre>
+                <div id="riskDistribution" class="small"></div>
               </div>
             </div>
           </div>
@@ -83,7 +122,7 @@
             <div class="card border-0 shadow-sm">
               <div class="card-header bg-white"><h5 class="mb-0">Doanh thu</h5></div>
               <div class="card-body">
-                <pre id="revenueAnalytics" class="mb-0 small bg-light p-3 rounded" style="max-height: 200px; overflow: auto;">Đang tải...</pre>
+                <div id="revenueAnalytics" class="small"></div>
               </div>
             </div>
           </div>
@@ -91,7 +130,7 @@
             <div class="card border-0 shadow-sm">
               <div class="card-header bg-white"><h5 class="mb-0">Tỷ lệ lỗi</h5></div>
               <div class="card-body">
-                <pre id="errorRates" class="mb-0 small bg-light p-3 rounded" style="max-height: 200px; overflow: auto;">Đang tải...</pre>
+                <div id="errorRates" class="small"></div>
               </div>
             </div>
           </div>

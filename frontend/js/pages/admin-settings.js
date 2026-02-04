@@ -10,7 +10,8 @@
   var pageError = document.getElementById('pageError');
   var btnSavePrivacy = document.getElementById('btnSavePrivacy');
   var btnSaveAiConfig = document.getElementById('btnSaveAiConfig');
-  var policiesJson = document.getElementById('policiesJson');
+  var policiesTable = document.getElementById('policiesTable');
+  var templatesTable = document.getElementById('templatesTable');
 
   var privacyIds = [
     'privacyDataRetentionDays',
@@ -83,19 +84,112 @@
       });
   }
 
+  function policyLabel(key) {
+    var map = {
+      ai_result_ready: 'Kết quả AI sẵn sàng',
+      clinic_approved: 'Phòng khám được duyệt',
+      payment_success: 'Thanh toán thành công',
+      high_risk_alert: 'Cảnh báo nguy cơ cao'
+    };
+    return map[key] || key;
+  }
+
+  function renderPolicies(policies) {
+    if (!policiesTable) return;
+    var keys = Object.keys(policies || {});
+    if (!keys.length) {
+      policiesTable.innerHTML = '<div class="text-muted small">Chưa có chính sách nào.</div>';
+      return;
+    }
+    keys.sort();
+    var html = '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead>' +
+      '<tr><th>Loại sự kiện</th><th>Bật</th><th>Kênh gửi</th><th>Người nhận</th><th>Ưu tiên</th><th>Giới hạn/ngày</th><th></th></tr>' +
+      '</thead><tbody>';
+    keys.forEach(function (k) {
+      var p = policies[k] || {};
+      var enabled = !!p.enabled;
+      var channels = p.channels || [];
+      var recipients = p.recipients || [];
+      var freq = p.frequency_limit != null ? p.frequency_limit : '';
+      var priority = p.priority || 'normal';
+      function cChecked(val) { return channels.indexOf(val) !== -1 ? 'checked' : ''; }
+      function rChecked(val) { return recipients.indexOf(val) !== -1 ? 'checked' : ''; }
+      html += '<tr data-policy-type="' + k + '">' +
+        '<td><div class="fw-semibold">' + policyLabel(k) + '</div><div class="text-muted small">' + k + '</div></td>' +
+        '<td><input type="checkbox" class="form-check-input" data-field="enabled" ' + (enabled ? 'checked' : '') + '></td>' +
+        '<td>' +
+          '<div class="form-check form-check-inline small"><input class="form-check-input" type="checkbox" value="in_app" data-field="channel" ' + cChecked('in_app') + '><label class="form-check-label">In-app</label></div>' +
+          '<div class="form-check form-check-inline small"><input class="form-check-input" type="checkbox" value="email" data-field="channel" ' + cChecked('email') + '><label class="form-check-label">Email</label></div>' +
+          '<div class="form-check form-check-inline small"><input class="form-check-input" type="checkbox" value="sms" data-field="channel" ' + cChecked('sms') + '><label class="form-check-label">SMS</label></div>' +
+        '</td>' +
+        '<td>' +
+          '<div class="form-check form-check-inline small"><input class="form-check-input" type="checkbox" value="patient" data-field="recipient" ' + rChecked('patient') + '><label class="form-check-label">Bệnh nhân</label></div>' +
+          '<div class="form-check form-check-inline small"><input class="form-check-input" type="checkbox" value="doctor" data-field="recipient" ' + rChecked('doctor') + '><label class="form-check-label">Bác sĩ</label></div>' +
+          '<div class="form-check form-check-inline small"><input class="form-check-input" type="checkbox" value="clinic_manager" data-field="recipient" ' + rChecked('clinic_manager') + '><label class="form-check-label">Quản lý PK</label></div>' +
+          '<div class="form-check form-check-inline small"><input class="form-check-input" type="checkbox" value="admin" data-field="recipient" ' + rChecked('admin') + '><label class="form-check-label">Admin</label></div>' +
+        '</td>' +
+        '<td><select class="form-select form-select-sm" data-field="priority">' +
+          ['low','normal','high','urgent'].map(function (opt) {
+            return '<option value="' + opt + '"' + (opt === priority ? ' selected' : '') + '>' +
+              (opt === 'low' ? 'Thấp' : opt === 'normal' ? 'Bình thường' : opt === 'high' ? 'Cao' : 'Khẩn cấp') +
+              '</option>';
+          }).join('') +
+        '</select></td>' +
+        '<td><input type="number" class="form-control form-control-sm" min="0" data-field="frequency_limit" value="' + (freq === '' ? '' : freq) + '" placeholder="Không giới hạn"></td>' +
+        '<td class="text-end"><button type="button" class="btn btn-outline-primary btn-sm btn-save-policy" data-policy-type="' + k + '">Lưu</button></td>' +
+        '</tr>';
+    });
+    html += '</tbody></table></div>';
+    policiesTable.innerHTML = html;
+  }
+
   function loadPolicies() {
+    if (!policiesTable) return;
+    policiesTable.innerHTML = '<div class="text-muted small">Đang tải...</div>';
     window.AuraAPI.getAdminCommunicationPolicies()
       .then(function (data) {
-        if (policiesJson) {
-          try {
-            policiesJson.textContent = typeof data === 'object' ? JSON.stringify(data, null, 2) : String(data);
-          } catch (e) {
-            policiesJson.textContent = String(data);
-          }
-        }
+        var policies = data && data.policies ? data.policies : data;
+        renderPolicies(policies || {});
       })
       .catch(function (err) {
-        if (policiesJson) policiesJson.textContent = 'Lỗi: ' + (err.message || 'Tải thất bại.');
+        policiesTable.innerHTML = '<div class="text-danger small">Lỗi: ' + (err.message || 'Tải thất bại.') + '</div>';
+      });
+  }
+
+  function loadTemplates() {
+    if (!templatesTable) return;
+    templatesTable.innerHTML = '<div class="text-muted small">Đang tải...</div>';
+    window.AuraAPI.adminListNotificationTemplates(true)
+      .then(function (data) {
+        var list = (data && data.templates) || [];
+        if (!list.length) {
+          templatesTable.innerHTML = '<div class="text-muted small">Chưa có mẫu thông báo.</div>';
+          return;
+        }
+        list.sort(function (a, b) {
+          if (a.template_type === b.template_type) return a.template_id - b.template_id;
+          return String(a.template_type).localeCompare(String(b.template_type));
+        });
+        var html = '<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead>' +
+          '<tr><th>Loại</th><th>Tên mẫu</th><th>Tiêu đề</th><th>Trạng thái</th><th></th></tr></thead><tbody>';
+        list.forEach(function (t) {
+          html += '<tr data-template-id="' + t.template_id + '">' +
+            '<td><div class="fw-semibold">' + (t.template_type || '-') + '</div></td>' +
+            '<td>' + (t.template_name || '-') + '</td>' +
+            '<td class="small text-muted">' + (t.subject || '-') + '</td>' +
+            '<td>' + (t.is_active ? '<span class="badge bg-success">Đang dùng</span>' : '<span class="badge bg-secondary">Không dùng</span>') + '</td>' +
+            '<td class="text-end">' +
+              (t.is_active
+                ? '<button type="button" class="btn btn-outline-secondary btn-sm btn-deactivate-template" data-template-id="' + t.template_id + '">Tắt</button>'
+                : '<button type="button" class="btn btn-outline-primary btn-sm btn-activate-template" data-template-id="' + t.template_id + '">Kích hoạt</button>') +
+            '</td>' +
+            '</tr>';
+        });
+        html += '</tbody></table></div>';
+        templatesTable.innerHTML = html;
+      })
+      .catch(function (err) {
+        templatesTable.innerHTML = '<div class="text-danger small">Lỗi: ' + (err.message || 'Tải thất bại.') + '</div>';
       });
   }
 
@@ -154,4 +248,58 @@
   loadPrivacy();
   loadAiConfig();
   loadPolicies();
+  loadTemplates();
+
+  if (policiesTable) {
+    policiesTable.addEventListener('click', function (e) {
+      var btn = e.target.closest('.btn-save-policy');
+      if (!btn) return;
+      var type = btn.getAttribute('data-policy-type');
+      var row = policiesTable.querySelector('tr[data-policy-type=\"' + type + '\"]');
+      if (!row) return;
+      var enabled = !!row.querySelector('input[data-field=\"enabled\"]').checked;
+      var channels = [];
+      row.querySelectorAll('input[data-field=\"channel\"]:checked').forEach(function (el) { channels.push(el.value); });
+      var recipients = [];
+      row.querySelectorAll('input[data-field=\"recipient\"]:checked').forEach(function (el) { recipients.push(el.value); });
+      var priorityEl = row.querySelector('select[data-field=\"priority\"]');
+      var priority = priorityEl ? priorityEl.value : 'normal';
+      var freqEl = row.querySelector('input[data-field=\"frequency_limit\"]');
+      var freqVal = freqEl && freqEl.value !== '' ? parseInt(freqEl.value, 10) : null;
+      var payload = {
+        enabled: enabled,
+        channels: channels,
+        recipients: recipients,
+        priority: priority
+      };
+      if (freqVal != null && !isNaN(freqVal) && freqVal > 0) payload.frequency_limit = freqVal;
+      window.AuraAPI.updateAdminCommunicationPolicy(type, payload)
+        .then(function () {
+          if (window.AuraAlert && window.AuraAlert.toast) window.AuraAlert.toast('Đã lưu chính sách ' + type + '.', 'success');
+        })
+        .catch(function (err) {
+          if (window.AuraAlert && window.AuraAlert.toast) window.AuraAlert.toast(err.message || 'Lỗi lưu chính sách.', 'danger');
+        });
+    });
+  }
+
+  if (templatesTable) {
+    templatesTable.addEventListener('click', function (e) {
+      var activateBtn = e.target.closest('.btn-activate-template');
+      var deactivateBtn = e.target.closest('.btn-deactivate-template');
+      if (!activateBtn && !deactivateBtn) return;
+      var id = (activateBtn || deactivateBtn).getAttribute('data-template-id');
+      if (!id) return;
+      var action = activateBtn ? 'activate' : 'deactivate';
+      var fn = activateBtn ? window.AuraAPI.adminActivateNotificationTemplate : window.AuraAPI.adminDeactivateNotificationTemplate;
+      fn(id)
+        .then(function () {
+          if (window.AuraAlert && window.AuraAlert.toast) window.AuraAlert.toast((action === 'activate' ? 'Đã kích hoạt mẫu.' : 'Đã tắt mẫu.'), 'success');
+          loadTemplates();
+        })
+        .catch(function (err) {
+          if (window.AuraAlert && window.AuraAlert.toast) window.AuraAlert.toast(err.message || 'Lỗi khi cập nhật mẫu.', 'danger');
+        });
+    });
+  }
 })();

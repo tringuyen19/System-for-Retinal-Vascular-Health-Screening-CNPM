@@ -14,6 +14,8 @@
   var statRevenue = document.getElementById('statRevenue');
   var aiConfidence = document.getElementById('aiConfidence');
   var aiSuccessRate = document.getElementById('aiSuccessRate');
+  var aiActiveModel = document.getElementById('aiActiveModel');
+  var aiHighCritical = document.getElementById('aiHighCritical');
 
   function showError(msg) {
     if (!pageError) return;
@@ -32,6 +34,8 @@
     setEl(statRevenue, '...');
     setEl(aiConfidence, '...');
     setEl(aiSuccessRate, '...');
+    setEl(aiActiveModel, '...');
+    setEl(aiHighCritical, '...');
 
     window.AuraAPI.getAdminDashboard()
       .then(function (d) {
@@ -47,8 +51,37 @@
         setEl(statImages, imgText);
         var rev = revenue.total_revenue;
         setEl(statRevenue, rev != null ? (typeof rev === 'number' ? rev.toLocaleString('vi-VN') : rev) : '-');
-        setEl(aiConfidence, ai.average_confidence != null ? (Number(ai.average_confidence) * 100).toFixed(1) + '%' : '-');
-        setEl(aiSuccessRate, usage.success_rate != null ? (Number(usage.success_rate) * 100).toFixed(1) + '%' : '-');
+        if (ai.average_confidence != null) {
+          var c = Number(ai.average_confidence);
+          setEl(aiConfidence, (c <= 1 && c >= 0 ? (c * 100).toFixed(1) : c.toFixed(1)) + '%');
+        } else {
+          setEl(aiConfidence, '-');
+        }
+        if (usage.success_rate != null) {
+          var sr = Number(usage.success_rate);
+          setEl(aiSuccessRate, (sr <= 1 && sr >= 0 ? (sr * 100).toFixed(1) : sr.toFixed(1)) + '%');
+        } else {
+          setEl(aiSuccessRate, '-');
+        }
+
+        // Active model (if any)
+        if (ai.active_model && (ai.active_model.model_name || ai.active_model.version)) {
+          var name = ai.active_model.model_name || 'AI';
+          var ver = ai.active_model.version ? (' v' + ai.active_model.version) : '';
+          setEl(aiActiveModel, name + ver);
+        } else {
+          setEl(aiActiveModel, '-');
+        }
+
+        // High/Critical counts
+        var rd = ai.risk_distribution || {};
+        var high = Number(rd.high || 0);
+        var critical = Number(rd.critical || 0);
+        if (!isNaN(high) && !isNaN(critical)) {
+          setEl(aiHighCritical, (high + critical).toLocaleString('vi-VN'));
+        } else {
+          setEl(aiHighCritical, '-');
+        }
       })
       .catch(function (err) {
         showError(err.message || 'Tải dashboard thất bại.');
@@ -58,6 +91,8 @@
         setEl(statRevenue, '-');
         setEl(aiConfidence, '-');
         setEl(aiSuccessRate, '-');
+        setEl(aiActiveModel, '-');
+        setEl(aiHighCritical, '-');
       });
   }
 
