@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tải lên hàng loạt ảnh võng mạc | Phòng khám | AURA</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="../css/style.css" rel="stylesheet">
+  <style>
+    .file-item {
+      border: 1px solid #dee2e6;
+      border-radius: 0.375rem;
+      padding: 0.75rem;
+      margin-bottom: 0.5rem;
+      background-color: #fff;
+    }
+    .file-item.uploading {
+      background-color: #f8f9fa;
+      border-color: #0d6efd;
+    }
+    .file-item.success {
+      background-color: #d1e7dd;
+      border-color: #198754;
+    }
+    .file-item.error {
+      background-color: #f8d7da;
+      border-color: #dc3545;
+    }
+    .file-preview {
+      max-width: 100px;
+      max-height: 100px;
+      object-fit: cover;
+      border-radius: 0.25rem;
+    }
+    .drop-zone-active {
+      border-color: #0d6efd !important;
+      background-color: #e7f1ff !important;
+    }
+  </style>
+</head>
+<body class="d-flex flex-column min-vh-100 aura-fixed-header">
+  <header class="aura-header navbar navbar-expand-lg navbar-dark fixed-top" style="background-color: #212121;">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="../index.html">AURA</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain"><span class="navbar-toggler-icon"></span></button>
+      <div class="collapse navbar-collapse" id="navbarMain">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item"><a class="nav-link" href="../index.html">Trang chủ</a></li>
+          <li class="nav-item"><a class="nav-link" href="dashboard.html">Dashboard</a></li>
+        </ul>
+        <ul class="navbar-nav ms-auto align-items-center">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown"><i class="bi bi-person-circle me-1"></i><span id="headerUserName">Tài khoản</span></a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="profile.html">Hồ sơ phòng khám</a></li>
+              <li><a class="dropdown-item" href="settings.html">Cài đặt</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item text-danger" href="#" id="headerLogout">Đăng xuất</a></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </header>
+
+  <div class="d-flex flex-grow-1" style="padding-top: 56px;">
+    <aside class="aura-sidebar d-none d-md-flex flex-shrink-0 border-end bg-light" style="width: 250px; background-color: #f5f5f5 !important;">
+      <nav class="nav flex-column p-3 w-100">
+        <span class="text-muted small text-uppercase px-3 mb-2">Phòng khám</span>
+        <a class="nav-link rounded mb-1" href="dashboard.html"><i class="bi bi-house-door me-2"></i>Dashboard</a>
+        <a class="nav-link rounded mb-1" href="profile.html"><i class="bi bi-building me-2"></i>Hồ sơ</a>
+        <a class="nav-link rounded mb-1" href="members.html"><i class="bi bi-people me-2"></i>Bác sĩ &amp; Bệnh nhân</a>
+        <a class="nav-link rounded mb-1" href="images.html"><i class="bi bi-images me-2"></i>Ảnh võng mạc</a>
+        <a class="nav-link rounded mb-1 active" href="upload-bulk-images.html"><i class="bi bi-cloud-upload me-2"></i>Upload hàng loạt</a>
+        <a class="nav-link rounded mb-1" href="alerts.html"><i class="bi bi-exclamation-triangle me-2"></i>Cảnh báo</a>
+        <a class="nav-link rounded mb-1" href="reports-risk.html"><i class="bi bi-file-bar-graph me-2"></i>Báo cáo &amp; Rủi ro</a>
+        <a class="nav-link rounded mb-1" href="screening-campaign.html"><i class="bi bi-clipboard-pulse me-2"></i>Báo cáo sàng lọc</a>
+        <a class="nav-link rounded mb-1" href="usage.html"><i class="bi bi-pie-chart me-2"></i>Sử dụng</a>
+        <a class="nav-link rounded mb-1" href="export.html"><i class="bi bi-download me-2"></i>Xuất thống kê</a>
+        <a class="nav-link rounded mb-1" href="subscriptions.html"><i class="bi bi-credit-card me-2"></i>Gói đăng ký</a>
+        <hr class="my-2">
+        <a class="nav-link rounded mb-1" href="settings.html"><i class="bi bi-gear me-2"></i>Cài đặt</a>
+      </nav>
+    </aside>
+
+    <main class="flex-grow-1 p-4" style="background-color: #f5f5f5;">
+      <div class="container-fluid">
+        <h1 class="h3 mb-4">Tải lên hàng loạt ảnh võng mạc</h1>
+        <div id="pageError" class="alert alert-danger d-none"></div>
+        <div id="pageSuccess" class="alert alert-success d-none"></div>
+
+        <!-- Patient Selection -->
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-body">
+            <h5 class="card-title mb-3">Chọn bệnh nhân</h5>
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Bệnh nhân <span class="text-danger">*</span></label>
+                <select class="form-select" id="patientSelect" required>
+                  <option value="">-- Chọn bệnh nhân --</option>
+                </select>
+                <small class="form-text text-muted">Chọn bệnh nhân trong phòng khám để upload ảnh</small>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Phòng khám <span class="text-danger">*</span></label>
+                <select class="form-select" id="clinicSelect" required>
+                  <option value="">-- Chọn phòng khám --</option>
+                </select>
+                <small class="form-text text-muted">Phòng khám liên quan đến ảnh</small>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Global Settings -->
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-body">
+            <h5 class="card-title mb-3">Cài đặt chung (áp dụng cho tất cả ảnh)</h5>
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Loại ảnh</label>
+                <select class="form-select" id="globalImageType">
+                  <option value="fundus">Fundus</option>
+                  <option value="oct">OCT</option>
+                  <option value="fluorescein">Fluorescein</option>
+                </select>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Bên mắt</label>
+                <select class="form-select" id="globalEyeSide">
+                  <option value="left">Trái</option>
+                  <option value="right">Phải</option>
+                  <option value="both">Cả hai</option>
+                </select>
+              </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="btnApplyGlobal">Áp dụng cho tất cả ảnh</button>
+          </div>
+        </div>
+
+        <!-- File Upload Zone -->
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-body">
+            <h5 class="card-title mb-3">Chọn ảnh</h5>
+            <div id="dropZone" class="border border-2 border-dashed rounded p-5 text-center bg-light" style="min-height: 200px;">
+              <i class="bi bi-cloud-arrow-up display-4 text-muted"></i>
+              <p class="mt-2 mb-1">Kéo thả nhiều ảnh vào đây hoặc bấm để chọn file</p>
+              <p class="small text-muted mb-2">Hỗ trợ: JPG, PNG, GIF (tối đa 5MB mỗi file)</p>
+              <input type="file" id="fileInput" accept="image/*" multiple class="d-none">
+              <button type="button" class="btn btn-outline-primary btn-sm mt-2" id="btnSelectFiles">Chọn nhiều file</button>
+            </div>
+            <div id="filesList" class="mt-3"></div>
+          </div>
+        </div>
+
+        <!-- Upload Progress -->
+        <div class="card border-0 shadow-sm mb-4 d-none" id="uploadProgressCard">
+          <div class="card-body">
+            <h5 class="card-title mb-3">Tiến trình upload</h5>
+            <div class="progress mb-3" style="height: 25px;">
+              <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" id="overallProgress" style="width: 0%">0%</div>
+            </div>
+            <div class="small text-muted">
+              <span id="uploadStatus">Đang chuẩn bị...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Upload Button -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <span class="text-muted">Đã chọn: <strong id="fileCount">0</strong> file</span>
+          </div>
+          <div>
+            <button type="button" class="btn btn-outline-secondary me-2" id="btnClearAll">Xóa tất cả</button>
+            <button type="button" class="btn btn-primary" id="btnUploadBulk" disabled>
+              <i class="bi bi-cloud-upload me-1"></i>Upload hàng loạt
+            </button>
+          </div>
+        </div>
+
+        <!-- Results Summary -->
+        <div class="card border-0 shadow-sm d-none" id="resultsCard">
+          <div class="card-body">
+            <h5 class="card-title mb-3">Kết quả upload</h5>
+            <div id="resultsSummary"></div>
+            <div id="resultsDetails" class="mt-3"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <footer class="aura-footer py-3 border-top" style="background-color: #f5f5f5;"><div class="container-fluid"><span class="text-muted small">&copy; 2025 AURA</span></div></footer>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/components/header.js"></script>
+  <script src="../js/components/sidebar.js"></script>
+  <script src="../js/components/alert.js"></script>
+  <script src="../js/pages/doctor-upload-bulk-images.js"></script>
+</body>
+</html>

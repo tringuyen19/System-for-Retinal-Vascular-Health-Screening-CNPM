@@ -9,6 +9,8 @@ from infrastructure.repositories.retinal_image_repository import RetinalImageRep
 from infrastructure.repositories.ai_result_repository import AiResultRepository
 from infrastructure.repositories.subscription_repository import SubscriptionRepository
 from infrastructure.repositories.medical_report_repository import MedicalReportRepository
+from infrastructure.repositories.service_package_repository import ServicePackageRepository
+from infrastructure.repositories.payment_repository import PaymentRepository
 from infrastructure.databases.mssql import session
 from services.clinic_service import ClinicService
 from api.responses import success_response, error_response, not_found_response, validation_error_response
@@ -25,6 +27,8 @@ image_repo = RetinalImageRepository(session)
 result_repo = AiResultRepository(session)
 subscription_repo = SubscriptionRepository(session)
 report_repo = MedicalReportRepository(session)
+package_repo = ServicePackageRepository(session)
+payment_repo = PaymentRepository(session)
 
 # Initialize SERVICE with dependency injection ✅
 clinic_service = ClinicService(
@@ -35,7 +39,9 @@ clinic_service = ClinicService(
     image_repository=image_repo,
     result_repository=result_repo,
     subscription_repository=subscription_repo,
-    report_repository=report_repo
+    report_repository=report_repo,
+    service_package_repository=package_repo,
+    payment_repository=payment_repo
 )
 
 
@@ -56,7 +62,13 @@ def health_check():
 @clinic_bp.route('', methods=['POST'])
 def create_clinic():
     """
-    Register a new clinic
+    Register a new clinic with manager account (FR-22)
+    
+    This endpoint:
+    1. Creates a new clinic record
+    2. Creates a ClinicManager account linked to the clinic
+    3. Sets verification status to 'pending'
+    
     ---
     tags:
       - Clinic
@@ -71,59 +83,106 @@ def create_clinic():
         schema:
           type: object
           required:
-            - clinic_name
+            - name
             - address
-            - phone_number
+            - phone
+            - logo_url
+            - manager_email
+            - manager_password
           properties:
-            clinic_name:
+            name:
               type: string
               example: "City Eye Clinic"
             address:
               type: string
               example: "123 Main Street, City"
-            phone_number:
+            phone:
               type: string
               example: "+1234567890"
             logo_url:
               type: string
               example: "https://example.com/logo.png"
-            description:
+              description: Logo URL (optional)
+            license_number:
               type: string
-              example: "Leading eye care clinic"
+              example: "LIC-12345"
+              description: Business license number (optional)
+            tax_id:
+              type: string
+              example: "TAX-67890"
+              description: Tax identification number (optional)
+            verification_documents:
+              type: array
+              items:
+                type: string
+              example: ["https://example.com/doc1.pdf", "https://example.com/doc2.pdf"]
+              description: List of document URLs for verification (optional)
+            manager_email:
+              type: string
+              format: email
+              example: "manager@clinic.com"
+            manager_password:
+              type: string
+              format: password
+              minLength: 6
+              example: "password123"
     responses:
       201:
-        description: Clinic created successfully
+        description: Clinic registered successfully. Pending verification.
         schema:
           type: object
           properties:
             message:
               type: string
-              example: Clinic created successfully
+              example: Clinic registered successfully. Pending verification.
             data:
               type: object
+              properties:
+                clinic_id:
+                  type: integer
+                name:
+                  type: string
+                verification_status:
+                  type: string
+                  enum: [pending]
       400:
         description: Invalid input
+      409:
+        description: Email already exists
     """
     try:
+        from domain.exceptions import ConflictException
+        
         # STEP 1: Validate request data with schema
         schema = ClinicCreateRequestSchema()
         data = schema.load(request.get_json())
         
-        # STEP 2: Call SERVICE to register clinic ✅
+        # STEP 2: Call SERVICE to register clinic with manager account ✅
         clinic = clinic_service.register_clinic(
             name=data['name'],
             address=data['address'],
             phone=data['phone'],
-            logo_url=data['logo_url'],
+            manager_email=data['manager_email'],
+            manager_password=data['manager_password'],
+            logo_url=data.get('logo_url'),
+            license_number=data.get('license_number'),
+            tax_id=data.get('tax_id'),
+            verification_documents=data.get('verification_documents'),
             verification_status='pending'
         )
         
         # STEP 3: Serialize response with schema
         response_schema = ClinicResponseSchema()
-        return success_response(response_schema.dump(clinic), 'Clinic registered successfully. Pending verification.', 201)
+        return success_response(
+            response_schema.dump(clinic), 
+            'Phòng khám đã được đăng ký thành công. Đang chờ xác minh tổ chức.', 
+            201
+        )
         
     except ValidationError as e:
         return validation_error_response(e.messages)
+    except ConflictException as e:
+        return error_response(str(e), 409)
     except ValueError as e:
         return error_response(str(e), 400)
     except Exception as e:
@@ -431,11 +490,8 @@ def reject_clinic(clinic_id):
         if not clinic:
             return not_found_response('Clinic not found')
         
-        return success_response({
-            'clinic_id': clinic.clinic_id,
-            'clinic_name': clinic.clinic_name,
-            'verification_status': clinic.verification_status
-        }, 'Clinic verification rejected')
+        schema = ClinicResponseSchema()
+        return success_response(schema.dump(clinic), 'Clinic verification rejected')
         
     except NotFoundException as e:
         return not_found_response(str(e))

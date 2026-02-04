@@ -44,7 +44,7 @@
   function renderTable(list) {
     if (!clinicsTableBody) return;
     if (!list || list.length === 0) {
-      clinicsTableBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Không có phòng khám</td></tr>';
+      clinicsTableBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Không có phòng khám</td></tr>';
       return;
     }
     var html = '';
@@ -52,21 +52,36 @@
       var id = c.clinic_id != null ? c.clinic_id : c.id;
       var status = (c.verification_status || c.status || 'pending');
       var badgeClass = status === 'verified' ? 'success' : status === 'pending' ? 'warning' : status === 'rejected' ? 'danger' : status === 'suspended' ? 'secondary' : 'secondary';
+      
+      // Verification info
+      var verificationInfo = [];
+      if (c.license_number) verificationInfo.push('<small class="d-block"><i class="bi bi-file-earmark-text me-1"></i>GP: ' + c.license_number + '</small>');
+      if (c.tax_id) verificationInfo.push('<small class="d-block"><i class="bi bi-receipt me-1"></i>MST: ' + c.tax_id + '</small>');
+      if (c.manager_email) verificationInfo.push('<small class="d-block"><i class="bi bi-envelope me-1"></i>' + c.manager_email + '</small>');
+      if (c.verification_documents && Array.isArray(c.verification_documents) && c.verification_documents.length > 0) {
+        verificationInfo.push('<small class="d-block"><i class="bi bi-paperclip me-1"></i>' + c.verification_documents.length + ' tài liệu</small>');
+      }
+      var verificationHtml = verificationInfo.length > 0 ? verificationInfo.join('') : '<small class="text-muted">Chưa có</small>';
+      
       html += '<tr>';
       html += '<td>' + id + '</td>';
-      html += '<td>' + (c.name || c.clinic_name || '-') + '</td>';
+      html += '<td><strong>' + (c.name || c.clinic_name || '-') + '</strong></td>';
       html += '<td>' + (c.address || '-') + '</td>';
+      html += '<td>' + verificationHtml + '</td>';
       html += '<td><span class="badge bg-' + badgeClass + '">' + status + '</span></td>';
       html += '<td>';
       if (status === 'pending') {
-        html += '<button type="button" class="btn btn-sm btn-success me-1 btn-verify" data-id="' + id + '">Duyệt</button>';
-        html += '<button type="button" class="btn btn-sm btn-danger me-1 btn-reject" data-id="' + id + '">Từ chối</button>';
+        html += '<button type="button" class="btn btn-sm btn-success me-1 btn-verify" data-id="' + id + '" title="Duyệt phòng khám"><i class="bi bi-check-circle"></i> Duyệt</button>';
+        html += '<button type="button" class="btn btn-sm btn-danger me-1 btn-reject" data-id="' + id + '" title="Từ chối"><i class="bi bi-x-circle"></i> Từ chối</button>';
+        html += '<button type="button" class="btn btn-sm btn-info btn-detail" data-id="' + id + '" title="Xem chi tiết"><i class="bi bi-eye"></i></button>';
       }
       if (status === 'verified') {
-        html += '<button type="button" class="btn btn-sm btn-warning me-1 btn-suspend" data-id="' + id + '">Treo</button>';
+        html += '<button type="button" class="btn btn-sm btn-warning me-1 btn-suspend" data-id="' + id + '" title="Treo phòng khám"><i class="bi bi-pause-circle"></i> Treo</button>';
+        html += '<button type="button" class="btn btn-sm btn-info btn-detail" data-id="' + id + '" title="Xem chi tiết"><i class="bi bi-eye"></i></button>';
       }
       if (status === 'suspended' || status === 'rejected') {
-        html += '<button type="button" class="btn btn-sm btn-primary me-1 btn-approve" data-id="' + id + '">Phê duyệt</button>';
+        html += '<button type="button" class="btn btn-sm btn-primary me-1 btn-approve" data-id="' + id + '" title="Phê duyệt/Gỡ treo"><i class="bi bi-check-circle"></i> Phê duyệt</button>';
+        html += '<button type="button" class="btn btn-sm btn-info btn-detail" data-id="' + id + '" title="Xem chi tiết"><i class="bi bi-eye"></i></button>';
       }
       html += '</td></tr>';
     });
@@ -96,6 +111,60 @@
         confirmAction({ type: 'suspend', clinicId: id, title: 'Treo phòng khám', message: 'Treo phòng khám ID ' + id + '?', showReason: true, reasonLabel: 'Lý do treo (tùy chọn)' });
       });
     });
+    clinicsTableBody.querySelectorAll('.btn-detail').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var id = this.getAttribute('data-id');
+        showClinicDetail(id);
+      });
+    });
+  }
+
+  function showClinicDetail(clinicId) {
+    window.AuraAPI.listClinics()
+      .then(function (res) {
+        var list = (res && res.clinics) ? res.clinics : [];
+        var clinic = list.find(function (c) {
+          return (c.clinic_id || c.id) == clinicId;
+        });
+        if (!clinic) {
+          if (window.AuraAlert && window.AuraAlert.toast) window.AuraAlert.toast('Không tìm thấy phòng khám', 'warning');
+          return;
+        }
+        
+        var detailHtml = '<div class="mb-3"><strong>Tên phòng khám:</strong> ' + (clinic.name || clinic.clinic_name || '-') + '</div>';
+        detailHtml += '<div class="mb-3"><strong>Địa chỉ:</strong> ' + (clinic.address || '-') + '</div>';
+        detailHtml += '<div class="mb-3"><strong>Số điện thoại:</strong> ' + (clinic.phone || '-') + '</div>';
+        if (clinic.license_number) detailHtml += '<div class="mb-3"><strong>Số giấy phép:</strong> ' + clinic.license_number + '</div>';
+        if (clinic.tax_id) detailHtml += '<div class="mb-3"><strong>Mã số thuế:</strong> ' + clinic.tax_id + '</div>';
+        if (clinic.manager_email) detailHtml += '<div class="mb-3"><strong>Email quản lý:</strong> ' + clinic.manager_email + '</div>';
+        if (clinic.verification_documents && Array.isArray(clinic.verification_documents) && clinic.verification_documents.length > 0) {
+          detailHtml += '<div class="mb-3"><strong>Tài liệu xác minh:</strong><ul class="mb-0">';
+          clinic.verification_documents.forEach(function (doc) {
+            detailHtml += '<li><a href="' + doc + '" target="_blank">' + doc + '</a></li>';
+          });
+          detailHtml += '</ul></div>';
+        }
+        detailHtml += '<div class="mb-3"><strong>Trạng thái:</strong> <span class="badge bg-' + (clinic.verification_status === 'verified' ? 'success' : clinic.verification_status === 'pending' ? 'warning' : clinic.verification_status === 'rejected' ? 'danger' : 'secondary') + '">' + (clinic.verification_status || 'pending') + '</span></div>';
+        detailHtml += '<div class="mb-0"><strong>Ngày tạo:</strong> ' + (clinic.created_at ? new Date(clinic.created_at).toLocaleString('vi-VN') : '-') + '</div>';
+        
+        if (modalActionMessage) {
+          modalActionMessage.innerHTML = detailHtml;
+          modalActionTitle.textContent = 'Chi tiết phòng khám #' + clinicId;
+          if (wrapReason) wrapReason.classList.add('d-none');
+          if (btnConfirmAction) btnConfirmAction.style.display = 'none';
+          var modal = bootstrap.Modal.getOrCreateInstance(modalAction);
+          if (modal) modal.show();
+          
+          // Restore button when modal is hidden
+          modalAction.addEventListener('hidden.bs.modal', function handler() {
+            if (btnConfirmAction) btnConfirmAction.style.display = '';
+            modalAction.removeEventListener('hidden.bs.modal', handler);
+          });
+        }
+      })
+      .catch(function (e) {
+        if (window.AuraAlert && window.AuraAlert.toast) window.AuraAlert.toast(e.message || 'Lỗi', 'danger');
+      });
   }
 
   function confirmAction(opts) {

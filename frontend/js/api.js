@@ -62,9 +62,13 @@
     if (category) form.append('category', category);
 
     const headers = {};
-    const key = (window.AURA_CONFIG && window.AURA_CONFIG.STORAGE_KEYS && window.AURA_CONFIG.STORAGE_KEYS.TOKEN) || 'aura_access_token';
-    const token = localStorage.getItem(key);
-    if (token) headers['Authorization'] = 'Bearer ' + token;
+    // For clinic logo upload, no auth required
+    // For other categories, include auth token if available
+    if (category !== 'clinic') {
+      const key = (window.AURA_CONFIG && window.AURA_CONFIG.STORAGE_KEYS && window.AURA_CONFIG.STORAGE_KEYS.TOKEN) || 'aura_access_token';
+      const token = localStorage.getItem(key);
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+    }
 
     let res;
     try {
@@ -120,6 +124,12 @@
   /** Patient: upload ảnh (JSON: patient_id, clinic_id, uploaded_by, image_type, eye_side, image_url) */
   async function uploadImage(payload) {
     const res = await request('POST', '/api/retinal-images', payload);
+    return res.data;
+  }
+
+  /** Doctor/Admin/ClinicManager: upload nhiều ảnh hàng loạt (FR-24) - POST /api/retinal-images/bulk */
+  async function uploadBulkImages(payload) {
+    const res = await request('POST', '/api/retinal-images/bulk', payload);
     return res.data;
   }
 
@@ -509,6 +519,27 @@
     return res.data;
   }
 
+  /** Service packages: danh sách gói cấp phòng khám (ids 6,7,8) - FR-28 */
+  async function getServicePackagesForClinic() {
+    const res = await request('GET', '/api/service-packages?ids=6,7,8');
+    return res.data;
+  }
+
+  /** Mua gói cấp phòng khám (demo) - FR-28 */
+  async function purchaseClinicPackageDemo(accountId, packageId) {
+    const res = await request('POST', '/api/subscriptions/purchase-clinic-demo', { account_id: accountId, package_id: packageId });
+    return res.data;
+  }
+
+  /** Gia hạn subscription - FR-28 */
+  async function renewSubscription(subscriptionId, durationDays, additionalCredits) {
+    const res = await request('PUT', '/api/subscriptions/' + subscriptionId + '/renew', {
+      duration_days: durationDays,
+      additional_credits: additionalCredits != null ? additionalCredits : 0
+    });
+    return res.data;
+  }
+
   /** Payments: lịch sử thanh toán theo account (GET /api/payments/account/:id/history) - FR-12 */
   async function getPaymentHistory(accountId, limit, offset) {
     let path = '/api/payments/account/' + accountId + '/history';
@@ -616,6 +647,13 @@
   /** Admin: xóa role (DELETE /api/roles/:id) */
   async function deleteRole(roleId) {
     const res = await request('DELETE', '/api/roles/' + roleId);
+    return res.data;
+  }
+
+  // ---------- Clinic Registration (FR-22) ----------
+  /** Register clinic with manager account (POST /api/clinics) */
+  async function registerClinic(payload) {
+    const res = await request('POST', '/api/clinics', payload, false);
     return res.data;
   }
 
@@ -807,6 +845,7 @@
     getImagesByPatient,
     getImageStatsByPatient,
     uploadImage,
+    uploadBulkImages,
     getReportsByPatient,
     createPatient,
     updatePatient,
@@ -861,6 +900,9 @@
     getAccountCredits,
     purchasePackageDemo,
     getServicePackagesForPatient,
+    getServicePackagesForClinic,
+    purchaseClinicPackageDemo,
+    renewSubscription,
     getPaymentHistory,
     getNotificationsByAccount,
     getAllAccounts,
@@ -877,6 +919,7 @@
     createRole,
     updateRole,
     deleteRole,
+    registerClinic,
     listClinics,
     getPendingClinics,
     verifyClinic,

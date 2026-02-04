@@ -39,12 +39,12 @@
         <span class="text-muted small text-uppercase px-3 mb-2">Phòng khám</span>
         <a class="nav-link rounded mb-1" href="dashboard.html"><i class="bi bi-house-door me-2"></i>Dashboard</a>
         <a class="nav-link rounded mb-1" href="profile.html"><i class="bi bi-building me-2"></i>Hồ sơ</a>
-        <a class="nav-link rounded mb-1" href="members.html"><i class="bi bi-people me-2"></i>Thành viên</a>
-        <a class="nav-link rounded mb-1" href="patients.html"><i class="bi bi-person-lines-fill me-2"></i>Bệnh nhân</a>
+        <a class="nav-link rounded mb-1" href="members.html"><i class="bi bi-people me-2"></i>Bác sĩ &amp; Bệnh nhân</a>
         <a class="nav-link rounded mb-1" href="images.html"><i class="bi bi-images me-2"></i>Ảnh võng mạc</a>
-        <a class="nav-link rounded mb-1" href="analytics.html"><i class="bi bi-graph-up me-2"></i>Phân tích</a>
+        <a class="nav-link rounded mb-1" href="upload-bulk-images.html"><i class="bi bi-cloud-upload me-2"></i>Upload hàng loạt</a>
         <a class="nav-link rounded mb-1 active" href="alerts.html"><i class="bi bi-exclamation-triangle me-2"></i>Cảnh báo</a>
-        <a class="nav-link rounded mb-1" href="reports.html"><i class="bi bi-file-earmark-text me-2"></i>Báo cáo</a>
+        <a class="nav-link rounded mb-1" href="reports-risk.html"><i class="bi bi-file-bar-graph me-2"></i>Báo cáo &amp; Rủi ro</a>
+        <a class="nav-link rounded mb-1" href="screening-campaign.html"><i class="bi bi-clipboard-pulse me-2"></i>Báo cáo sàng lọc</a>
         <a class="nav-link rounded mb-1" href="usage.html"><i class="bi bi-pie-chart me-2"></i>Sử dụng</a>
         <a class="nav-link rounded mb-1" href="export.html"><i class="bi bi-download me-2"></i>Xuất thống kê</a>
         <a class="nav-link rounded mb-1" href="subscriptions.html"><i class="bi bi-credit-card me-2"></i>Gói đăng ký</a>
@@ -55,15 +55,18 @@
 
     <main class="flex-grow-1 p-4" style="background-color: #f5f5f5;">
       <div class="container-fluid">
-        <h1 class="h3 mb-4">Cảnh báo bệnh nhân nguy cơ cao</h1>
+        <h1 class="h3 mb-4">Cảnh báo bệnh nhân nguy cơ cao &amp; xu hướng bất thường</h1>
         <div id="pageError" class="alert alert-danger d-none"></div>
-        <div class="mb-3">
-          <select class="form-select form-select-sm w-auto d-inline-block" id="riskLevel">
-            <option value="high">Cao</option>
-            <option value="critical">Nghiêm trọng</option>
-          </select>
-        </div>
-        <div class="card border-0 shadow-sm">
+
+        <!-- 1. Cảnh báo nguy cơ cao -->
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <h5 class="mb-0"><i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>Cảnh báo bệnh nhân nguy cơ cao</h5>
+            <select class="form-select form-select-sm w-auto" id="riskLevel">
+              <option value="high">Cao (high + critical)</option>
+              <option value="critical">Nghiêm trọng (critical)</option>
+            </select>
+          </div>
           <div class="card-body">
             <div id="loading" class="text-center py-4">Đang tải...</div>
             <div id="content" class="d-none">
@@ -74,7 +77,7 @@
                       <th>Bệnh nhân</th>
                       <th>Mức rủi ro</th>
                       <th>Phân tích gần nhất</th>
-                      <th>Thời điểm</th>
+                      <th>Thời điểm phân tích</th>
                     </tr>
                   </thead>
                   <tbody id="tbody"></tbody>
@@ -82,7 +85,60 @@
               </div>
               <p class="text-muted small mb-0" id="summary"></p>
             </div>
-            <div id="empty" class="text-muted text-center py-4 d-none">Không có cảnh báo nào.</div>
+            <div id="empty" class="text-muted text-center py-4 d-none">Không có cảnh báo nguy cơ cao.</div>
+          </div>
+        </div>
+
+        <!-- 2. Xu hướng bất thường -->
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <h5 class="mb-0"><i class="bi bi-graph-up-arrow text-warning me-2"></i>Xu hướng bất thường</h5>
+            <div class="d-flex align-items-center gap-2">
+              <label class="text-muted small mb-0">Khoảng thời gian:</label>
+              <select class="form-select form-select-sm w-auto" id="trendDays">
+                <option value="7">7 ngày</option>
+                <option value="30" selected>30 ngày</option>
+                <option value="90">90 ngày</option>
+              </select>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="trendsLoading" class="text-center py-4 text-muted">Đang tải...</div>
+            <div id="trendsContent" class="d-none">
+              <p class="text-muted small mb-3" id="trendsSummary"></p>
+              <div id="noTrends" class="text-muted text-center py-3 d-none">Không phát hiện xu hướng bất thường trong khoảng thời gian đã chọn.</div>
+              <div id="trendsData" class="d-none">
+                <h6 class="mb-2">Tăng mức rủi ro</h6>
+                <div class="table-responsive mb-4">
+                  <table class="table table-sm table-hover align-middle">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Bệnh nhân</th>
+                        <th>Từ mức</th>
+                        <th>Sang mức</th>
+                        <th>Mức tăng</th>
+                      </tr>
+                    </thead>
+                    <tbody id="riskIncreasesTbody"></tbody>
+                  </table>
+                </div>
+                <h6 class="mb-2">Bước nhảy đột ngột (low/medium → high/critical)</h6>
+                <div class="table-responsive">
+                  <table class="table table-sm table-hover align-middle">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Bệnh nhân</th>
+                        <th>Ngày</th>
+                        <th>Từ</th>
+                        <th>Sang</th>
+                        <th>Độ tin cậy</th>
+                      </tr>
+                    </thead>
+                    <tbody id="suddenSpikesTbody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

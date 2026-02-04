@@ -5,6 +5,7 @@ from infrastructure.databases.mssql import session
 from infrastructure.models.clinic_model import ClinicModel
 from domain.models.clinic import Clinic
 from domain.models.iclinic_repository import IClinicRepository
+import json
 
 
 class ClinicRepository(IClinicRepository):
@@ -12,6 +13,13 @@ class ClinicRepository(IClinicRepository):
         self.session = db_session
     
     def _to_domain(self, model: ClinicModel) -> Clinic:
+        import json
+        verification_documents = []
+        if model.verification_documents:
+            try:
+                verification_documents = json.loads(model.verification_documents)
+            except:
+                verification_documents = []
         return Clinic(
             clinic_id=model.clinic_id,
             name=model.name,
@@ -19,15 +27,28 @@ class ClinicRepository(IClinicRepository):
             phone=model.phone,
             logo_url=model.logo_url,
             verification_status=model.verification_status,
-            created_at=model.created_at
+            created_at=model.created_at,
+            license_number=model.license_number,
+            tax_id=model.tax_id,
+            verification_documents=verification_documents,
+            manager_email=model.manager_email
         )
     
-    def add(self, name: str, address: str, phone: str, logo_url: str,
-            verification_status: str, created_at: datetime) -> Clinic:
+    def add(self, name: str, address: str, phone: str,
+            verification_status: str, created_at: datetime,
+            logo_url: Optional[str] = None, license_number: Optional[str] = None, 
+            tax_id: Optional[str] = None, verification_documents: Optional[List[str]] = None, 
+            manager_email: Optional[str] = None) -> Clinic:
         try:
+            import json
+            docs_json = None
+            if verification_documents:
+                docs_json = json.dumps(verification_documents)
             clinic_model = ClinicModel(
                 name=name, address=address, phone=phone, logo_url=logo_url,
-                verification_status=verification_status, created_at=created_at
+                verification_status=verification_status, created_at=created_at,
+                license_number=license_number, tax_id=tax_id,
+                verification_documents=docs_json, manager_email=manager_email
             )
             self.session.add(clinic_model)
             self.session.commit()
@@ -147,7 +168,7 @@ class ClinicRepository(IClinicRepository):
             raise ValueError(f'Error approving clinic: {str(e)}')
         finally:
             self.session.close()
-
+    
     def update(self, clinic_id: int, **kwargs) -> Optional[Clinic]:
         try:
             clinic_model = self.session.query(ClinicModel).filter_by(clinic_id=clinic_id).first()

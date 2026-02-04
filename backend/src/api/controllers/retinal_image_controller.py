@@ -5,11 +5,15 @@ from infrastructure.repositories.retinal_image_repository import RetinalImageRep
 from infrastructure.repositories.patient_profile_repository import PatientProfileRepository
 from infrastructure.repositories.clinic_repository import ClinicRepository
 from infrastructure.repositories.subscription_repository import SubscriptionRepository
+from infrastructure.repositories.ai_analysis_repository import AiAnalysisRepository
+from infrastructure.repositories.ai_model_version_repository import AiModelVersionRepository
 from infrastructure.databases.mssql import session
 from services.retinal_image_service import RetinalImageService
 from services.patient_profile_service import PatientProfileService
 from services.clinic_service import ClinicService
 from services.subscription_service import SubscriptionService
+from services.ai_analysis_service import AiAnalysisService
+from services.ai_model_version_service import AiModelVersionService
 from api.responses import success_response, error_response, not_found_response, validation_error_response
 from api.schemas import RetinalImageCreateRequestSchema, RetinalImageUpdateRequestSchema, RetinalImageResponseSchema, RetinalImageBulkCreateRequestSchema
 from domain.exceptions import BusinessRuleException
@@ -21,12 +25,16 @@ image_repo = RetinalImageRepository(session)
 patient_repo = PatientProfileRepository(session)
 clinic_repo = ClinicRepository(session)
 subscription_repo = SubscriptionRepository(session)
+analysis_repo = AiAnalysisRepository(session)
+model_version_repo = AiModelVersionRepository(session)
 
 # Initialize SERVICES (Business Logic Layer) ✅
 image_service = RetinalImageService(image_repo)
 patient_service = PatientProfileService(patient_repo)
 clinic_service = ClinicService(clinic_repo)
 subscription_service = SubscriptionService(subscription_repo)
+analysis_service = AiAnalysisService(analysis_repo)
+model_version_service = AiModelVersionService(model_version_repo)
 
 
 @retinal_image_bp.route('/health', methods=['GET'])
@@ -354,42 +362,162 @@ def upload_bulk_images():
         # If some images have errors but some are valid, proceed with valid ones
         # (Errors will be included in the final response from service)
         
+        # FR-24: Check credits for all valid images before processing
+        # Group images by uploaded_by to check credits per account
+        account_credits_needed = {}
+        for img_data in images_data:
+            account_id = img_data['uploaded_by']
+            account_credits_needed[account_id] = account_credits_needed.get(account_id, 0) + 1
+        
+        # Check if all accounts have sufficient credits
+        credit_check_errors = []
+        accounts_with_insufficient_credits = set()
+        for account_id, credits_needed in account_credits_needed.items():
+            remaining = subscription_service.get_remaining_credits(account_id)
+            if remaining < credits_needed:
+                accounts_with_insufficient_credits.add(account_id)
+                credit_check_errors.append({
+                    'account_id': account_id,
+                    'error': f'Insufficient credits. Required: {credits_needed}, Available: {remaining}'
+                })
+        
+        # Filter out images from accounts with insufficient credits
+        if accounts_with_insufficient_credits:
+            filtered_images_data = []
+            for img_data in images_data:
+                if img_data['uploaded_by'] in accounts_with_insufficient_credits:
+                    credit_check_errors.append({
+                        'image_url': img_data.get('image_url', 'unknown'),
+                        'error': f'Account {img_data["uploaded_by"]} has insufficient credits'
+                    })
+                else:
+                    filtered_images_data.append(img_data)
+            images_data = filtered_images_data
+        
+        # If no valid images remain after credit check, return errors
+        if not images_data:
+            all_errors = validation_errors + credit_check_errors
+            return jsonify({
+                'message': 'All images failed validation or have insufficient credits',
+                'errors': all_errors,
+                'total_images': len(data['images']),
+                'failed_count': len(all_errors)
+            }), 400
+        
         # Get optional batch_id from request
         batch_id = data.get('batch_id')
         
-        # Upload bulk images (only valid ones) with batch tracking
-        result = image_service.upload_bulk_images(images_data, batch_id=batch_id)
+        # FR-24: Upload bulk images with credit deduction and auto-trigger AI analysis
+        uploaded_images = []
+        upload_errors = []
+        analysis_created = []
+        analysis_errors = []
         
-        # Merge validation errors from controller with service errors
-        all_errors = validation_errors.copy()
-        for service_error in result['errors']:
-            # Service errors might have different format, add them as-is
-            if isinstance(service_error, dict):
-                all_errors.append(service_error)
-            else:
-                all_errors.append({'error': str(service_error)})
+        # Get active AI model for auto-analysis
+        active_model = model_version_service.get_active_model()
+        auto_analyze = active_model is not None
+        
+        for img_data in images_data:
+            account_id = img_data['uploaded_by']
+            image_url = img_data.get('image_url', 'unknown')
+            
+            try:
+                # FR-11/12: Deduct credit before uploading
+                try:
+                    updated = subscription_service.deduct_credit_for_account(account_id, 1)
+                    if not updated:
+                        upload_errors.append({
+                            'image_url': image_url,
+                            'error': 'Hết lượt phân tích. Vui lòng mua thêm gói.'
+                        })
+                        continue
+                except BusinessRuleException as e:
+                    upload_errors.append({
+                        'image_url': image_url,
+                        'error': str(e) or 'Hết lượt phân tích. Vui lòng mua thêm gói.'
+                    })
+                    continue
+                
+                # Upload image using service
+                image = image_service.upload_image(
+                    patient_id=img_data['patient_id'],
+                    clinic_id=img_data['clinic_id'],
+                    uploaded_by=img_data['uploaded_by'],
+                    image_type=img_data['image_type'],
+                    eye_side=img_data['eye_side'],
+                    image_url=img_data['image_url'],
+                    status=img_data.get('status', 'uploaded')
+                )
+                
+                if image:
+                    uploaded_images.append(image)
+                    
+                    # FR-24: Auto-trigger AI analysis if active model exists
+                    if auto_analyze:
+                        try:
+                            analysis = analysis_service.create_analysis(
+                                image_id=image.image_id,
+                                ai_model_version_id=active_model.ai_model_version_id,
+                                status='pending'
+                            )
+                            if analysis:
+                                analysis_created.append({
+                                    'image_id': image.image_id,
+                                    'analysis_id': analysis.analysis_id
+                                })
+                        except Exception as e:
+                            # Log analysis error but don't fail the upload
+                            analysis_errors.append({
+                                'image_id': image.image_id,
+                                'error': f'Failed to create analysis: {str(e)}'
+                            })
+                else:
+                    upload_errors.append({
+                        'image_url': image_url,
+                        'error': 'Failed to upload image'
+                    })
+            except Exception as e:
+                upload_errors.append({
+                    'image_url': image_url,
+                    'error': str(e)
+                })
+        
+        # Merge all errors
+        all_errors = validation_errors + credit_check_errors + upload_errors
         
         # Serialize successful uploads
         response_schema = RetinalImageResponseSchema()
-        serialized_uploaded = [response_schema.dump(img) for img in result['uploaded']]
+        serialized_uploaded = [response_schema.dump(img) for img in uploaded_images]
         
         # Calculate total counts including validation errors
         total_error_count = len(all_errors)
-        total_success_count = result['success_count']
+        total_success_count = len(uploaded_images)
         total_images = len(data['images'])
         
+        # Generate batch_id if not provided
+        import uuid
+        from datetime import datetime
+        if not batch_id:
+            batch_id = f"batch_{uuid.uuid4().hex[:8]}_{int(datetime.now().timestamp())}"
+        
         response_data = {
-            'batch_id': result['batch_id'],
-            'batch_status': result['batch_status'],
+            'batch_id': batch_id,
+            'batch_status': 'completed' if total_error_count == 0 else 'partial' if total_success_count > 0 else 'failed',
             'uploaded': serialized_uploaded,
             'errors': all_errors,
             'total': total_images,
             'success_count': total_success_count,
             'error_count': total_error_count,
-            'created_at': result['created_at']
+            'created_at': datetime.now().isoformat(),
+            'analysis_created': len(analysis_created),
+            'analysis_errors': analysis_errors if analysis_errors else None
         }
         
-        message = f"Bulk upload completed: {total_success_count} successful, {total_error_count} failed. Batch ID: {result['batch_id']}"
+        message = f"Bulk upload completed: {total_success_count} successful, {total_error_count} failed"
+        if auto_analyze and analysis_created:
+            message += f". {len(analysis_created)} analysis requests created automatically."
+        message += f" Batch ID: {batch_id}"
+        
         return success_response(response_data, message, 201)
         
     except ValidationError as e:

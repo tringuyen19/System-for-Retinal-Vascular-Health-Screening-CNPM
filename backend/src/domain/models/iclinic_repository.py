@@ -5,8 +5,11 @@ from datetime import datetime
 
 class IClinicRepository(ABC):
     @abstractmethod
-    def add(self, name: str, address: str, phone: str, logo_url: str, 
-            verification_status: str, created_at: datetime) -> Clinic:
+    def add(self, name: str, address: str, phone: str, 
+            verification_status: str, created_at: datetime,
+            logo_url: Optional[str] = None, license_number: Optional[str] = None, 
+            tax_id: Optional[str] = None, verification_documents: Optional[List[str]] = None, 
+            manager_email: Optional[str] = None) -> Clinic:
         pass
 
     @abstractmethod

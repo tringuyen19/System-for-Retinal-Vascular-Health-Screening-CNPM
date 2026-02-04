@@ -15,7 +15,7 @@ from config import Config
 upload_bp = Blueprint("uploads", __name__, url_prefix="/api/uploads")
 
 
-ALLOWED_CATEGORIES = {"retinal", "heatmaps"}
+ALLOWED_CATEGORIES = {"retinal", "heatmaps", "clinic"}
 ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 
 
@@ -39,14 +39,16 @@ def _build_public_urls(rel_path: str) -> dict:
 
 
 @upload_bp.route("", methods=["POST"])
-@require_roles(["Patient", "Doctor", "ClinicManager", "Admin"])
 def upload_file():
     """
     Upload a file to backend static/uploads and return a public URL.
+    
+    For clinic registration (category='clinic'), no authentication required.
+    For other categories, authentication is required.
 
     Multipart form-data:
       - file: file binary
-      - category: 'retinal' | 'heatmaps' (default: 'retinal')
+      - category: 'retinal' | 'heatmaps' | 'clinic' (default: 'retinal')
     """
     try:
         if "file" not in request.files:
@@ -59,6 +61,16 @@ def upload_file():
         category = (request.form.get("category") or "retinal").strip().lower()
         if category not in ALLOWED_CATEGORIES:
             return error_response(f"Invalid category. Allowed: {', '.join(sorted(ALLOWED_CATEGORIES))}.", 400)
+        
+        # For clinic logo upload during registration, no auth required
+        # For other categories, require authentication
+        if category != "clinic":
+            # Check authentication for non-clinic uploads
+            try:
+                from api.middleware.auth_middleware import verify_jwt_in_request
+                verify_jwt_in_request()
+            except Exception as e:
+                return error_response("Authentication required for this category.", 401)
 
         ext = _get_ext(f.filename)
         if ext not in ALLOWED_EXTENSIONS:

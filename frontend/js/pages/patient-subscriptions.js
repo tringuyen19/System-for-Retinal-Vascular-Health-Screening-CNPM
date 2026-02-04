@@ -82,14 +82,14 @@
             '<h5 class="card-title">' + (name) + '</h5>' +
             '<p class="text-muted small mb-1">Số ảnh: ' + limit + ' | Thời hạn: ' + days + ' ngày</p>' +
             '<p class="fs-5 text-primary mb-3">' + formatMoney(price) + '</p>' +
-            '<button type="button" class="btn btn-primary btn-sm btn-purchase" data-package-id="' + id + '" data-package-name="' + (name.replace(/"/g, '&quot;')) + '">Mua gói (chuyển khoản demo)</button>' +
+            '<button type="button" class="btn btn-primary btn-sm btn-purchase" data-package-id="' + id + '" data-package-name="' + (name.replace(/"/g, '&quot;')) + '">Mua gói</button>' +
             '</div></div></div>';
         }).join('');
         packagesList.querySelectorAll('.btn-purchase').forEach(function (btn) {
           btn.addEventListener('click', function () {
             selectedPackageId = parseInt(btn.getAttribute('data-package-id'), 10);
             selectedPackageName = btn.getAttribute('data-package-name') || ('Gói #' + selectedPackageId);
-            if (confirmPurchaseText) confirmPurchaseText.textContent = 'Thanh toán bằng phương thức chuyển khoản (demo). Bạn có chắc muốn mua gói "' + selectedPackageName + '"?';
+            if (confirmPurchaseText) confirmPurchaseText.textContent = 'Bạn có chắc muốn mua gói "' + selectedPackageName + '"?';
             var modal = bootstrap.Modal.getOrCreateInstance(confirmPurchaseModal);
             modal.show();
           });

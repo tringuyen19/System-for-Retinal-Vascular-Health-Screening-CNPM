@@ -39,12 +39,12 @@
         <span class="text-muted small text-uppercase px-3 mb-2">Phòng khám</span>
         <a class="nav-link rounded mb-1" href="dashboard.html"><i class="bi bi-house-door me-2"></i>Dashboard</a>
         <a class="nav-link rounded mb-1" href="profile.html"><i class="bi bi-building me-2"></i>Hồ sơ</a>
-        <a class="nav-link rounded mb-1" href="members.html"><i class="bi bi-people me-2"></i>Thành viên</a>
-        <a class="nav-link rounded mb-1" href="patients.html"><i class="bi bi-person-lines-fill me-2"></i>Bệnh nhân</a>
+        <a class="nav-link rounded mb-1" href="members.html"><i class="bi bi-people me-2"></i>Bác sĩ &amp; Bệnh nhân</a>
         <a class="nav-link rounded mb-1" href="images.html"><i class="bi bi-images me-2"></i>Ảnh võng mạc</a>
-        <a class="nav-link rounded mb-1" href="analytics.html"><i class="bi bi-graph-up me-2"></i>Phân tích</a>
+        <a class="nav-link rounded mb-1" href="upload-bulk-images.html"><i class="bi bi-cloud-upload me-2"></i>Upload hàng loạt</a>
         <a class="nav-link rounded mb-1" href="alerts.html"><i class="bi bi-exclamation-triangle me-2"></i>Cảnh báo</a>
-        <a class="nav-link rounded mb-1" href="reports.html"><i class="bi bi-file-earmark-text me-2"></i>Báo cáo</a>
+        <a class="nav-link rounded mb-1" href="reports-risk.html"><i class="bi bi-file-bar-graph me-2"></i>Báo cáo &amp; Rủi ro</a>
+        <a class="nav-link rounded mb-1" href="screening-campaign.html"><i class="bi bi-clipboard-pulse me-2"></i>Báo cáo sàng lọc</a>
         <a class="nav-link rounded mb-1" href="usage.html"><i class="bi bi-pie-chart me-2"></i>Sử dụng</a>
         <a class="nav-link rounded mb-1" href="export.html"><i class="bi bi-download me-2"></i>Xuất thống kê</a>
         <a class="nav-link rounded mb-1 active" href="subscriptions.html"><i class="bi bi-credit-card me-2"></i>Gói đăng ký</a>
@@ -55,22 +55,36 @@
 
     <main class="flex-grow-1 p-4" style="background-color: #f5f5f5;">
       <div class="container-fluid">
-        <h1 class="h3 mb-4">Gói đăng ký</h1>
+        <h1 class="h3 mb-4">Gói đăng ký</span></h1>
+        <p class="text-muted mb-3">Mua hoặc gia hạn gói dịch vụ cấp phòng khám. <a href="usage.html"></i>Xem mức sử dụng</a>.</p>
         <div id="pageError" class="alert alert-danger d-none"></div>
-        <div class="card border-0 shadow-sm">
+
+        <!-- FR-28: Mua gói cấp phòng khám -->
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-header bg-white"><h5 class="mb-0"><i class="bi bi-cart-plus me-2"></i>Mua gói dịch vụ cấp phòng khám</h5></div>
           <div class="card-body">
+            <div id="clinicPackagesLoading" class="text-center py-3 text-muted">Đang tải gói...</div>
+            <div id="clinicPackagesRow" class="row g-3 d-none"></div>
+          </div>
+        </div>
+
+        <!-- Gói đã đăng ký (tất cả) + Gia hạn gói clinic -->
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white"><h5 class="mb-0"><i class="bi bi-credit-card me-2"></i>Gói đã đăng ký &amp; Gia hạn</h5></div>
+          <div class="card-body">
+            <p class="mb-2" id="activeSummary"></p>
             <div id="loading" class="text-center py-4">Đang tải...</div>
             <div id="content" class="d-none">
-              <p class="mb-2" id="activeSummary"></p>
               <div class="table-responsive">
                 <table class="table table-hover align-middle">
                   <thead class="table-light">
                     <tr>
-                      <th>ID</th>
+                      <th>Gói</th>
                       <th>Trạng thái</th>
-                      <th>Credits</th>
+                      <th>Còn lại</th>
                       <th>Bắt đầu</th>
                       <th>Kết thúc</th>
+                      <th>Thao tác</th>
                     </tr>
                   </thead>
                   <tbody id="tbody"></tbody>
@@ -79,6 +93,46 @@
               <p class="text-muted small mb-0" id="listSummary"></p>
             </div>
             <div id="empty" class="text-muted text-center py-4 d-none">Chưa có gói đăng ký nào.</div>
+          </div>
+        </div>
+
+        <!-- Modal xác nhận mua gói (đơn giản như patient/subscription) -->
+        <div class="modal fade" id="purchaseConfirmModal" tabindex="-1">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">Xác nhận thanh toán</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <p id="confirmPurchaseText" class="mb-0">Bạn có chắc muốn mua gói này?</p>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary" id="btnConfirmPurchase">Xác nhận mua</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal gia hạn: gia hạn nguyên gói (thời hạn + lượt tải theo package) -->
+        <div class="modal fade" id="renewModal" tabindex="-1">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">Gia hạn gói</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <input type="hidden" id="renewSubscriptionId">
+                <input type="hidden" id="renewPackageId">
+                <p id="renewConfirmText" class="mb-0">Bạn có chắc muốn gia hạn gói này</p>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary" id="btnConfirmRenew">Xác nhận gia hạn</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -35,6 +35,63 @@ def _migrate_doctor_review_fr19():
                 print(f">>> Migration skip {table_name}.{col_name}: {e}")
 
 
+def _migrate_clinic_fr22():
+    """FR-22: Add organization verification fields to clinics table."""
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        dialect = engine.dialect.name
+        table_name = 'clinics'
+        
+        # Columns to add
+        columns_to_add = [
+            ('license_number', 'NVARCHAR(100)' if dialect != 'sqlite' else 'VARCHAR(100)'),
+            ('tax_id', 'NVARCHAR(50)' if dialect != 'sqlite' else 'VARCHAR(50)'),
+            ('verification_documents', 'NTEXT' if dialect != 'sqlite' else 'TEXT'),
+            ('manager_email', 'NVARCHAR(255)' if dialect != 'sqlite' else 'VARCHAR(255)')
+        ]
+        
+        for col_name, col_type in columns_to_add:
+            try:
+                if dialect == 'sqlite':
+                    conn.execute(text(f'ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}'))
+                else:
+                    # For MSSQL, check if column exists first
+                    check_sql = f"""
+                    IF NOT EXISTS (SELECT * FROM sys.columns 
+                                   WHERE object_id = OBJECT_ID(N'[dbo].[{table_name}]') 
+                                   AND name = '{col_name}')
+                    BEGIN
+                        ALTER TABLE [dbo].[{table_name}] ADD [{col_name}] {col_type} NULL;
+                    END
+                    """
+                    conn.execute(text(check_sql))
+                conn.commit()
+                print(f">>> Migrated: {table_name}.{col_name}")
+            except Exception as e:
+                error_msg = str(e).lower()
+                if 'duplicate' in error_msg or 'already exists' in error_msg or 'column name' in error_msg or 'invalid column name' in error_msg:
+                    print(f">>> Column {table_name}.{col_name} already exists or error (safe to ignore): {e}")
+                else:
+                    print(f">>> Migration error for {table_name}.{col_name}: {e}")
+        
+        # Make logo_url nullable if it's not already (MSSQL only)
+        try:
+            if dialect != 'sqlite':
+                update_sql = f"""
+                IF EXISTS (SELECT * FROM sys.columns 
+                          WHERE object_id = OBJECT_ID(N'[dbo].[{table_name}]') 
+                          AND name = 'logo_url' AND is_nullable = 0)
+                BEGIN
+                    ALTER TABLE [dbo].[{table_name}] ALTER COLUMN [logo_url] NVARCHAR(255) NULL;
+                END
+                """
+                conn.execute(text(update_sql))
+                conn.commit()
+                print(f">>> Updated {table_name}.logo_url to be nullable (if needed)")
+        except Exception as e:
+            print(f">>> Could not update logo_url nullable: {e}")
+
+
 def _migrate_medical_report_fr16():
     """FR-16: Add medical_notes, diagnosis, treatment_recommendations to medical_reports if missing."""
     from sqlalchemy import text
@@ -73,6 +130,7 @@ def init_mssql(app):
         print(f">>> Tables created successfully!")
         _migrate_medical_report_fr16()
         _migrate_doctor_review_fr19()
+        _migrate_clinic_fr22()
     except Exception as e:
         print(f"!!! Error creating tables: {e}")
         raise

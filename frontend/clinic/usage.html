@@ -3,10 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sử dụng dịch vụ | Phòng khám | AURA</title>
+  <title>Theo dõi sử dụng (FR-27) | Phòng khám | AURA</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
   <link href="../css/style.css" rel="stylesheet">
+  <style>
+    .usage-progress { height: 28px; font-size: 0.95rem; }
+    .stat-number { font-size: 1.75rem; font-weight: 600; }
+  </style>
 </head>
 <body class="d-flex flex-column min-vh-100 aura-fixed-header">
   <header class="aura-header navbar navbar-expand-lg navbar-dark fixed-top" style="background-color: #212121;">
@@ -39,12 +43,12 @@
         <span class="text-muted small text-uppercase px-3 mb-2">Phòng khám</span>
         <a class="nav-link rounded mb-1" href="dashboard.html"><i class="bi bi-house-door me-2"></i>Dashboard</a>
         <a class="nav-link rounded mb-1" href="profile.html"><i class="bi bi-building me-2"></i>Hồ sơ</a>
-        <a class="nav-link rounded mb-1" href="members.html"><i class="bi bi-people me-2"></i>Thành viên</a>
-        <a class="nav-link rounded mb-1" href="patients.html"><i class="bi bi-person-lines-fill me-2"></i>Bệnh nhân</a>
+        <a class="nav-link rounded mb-1 active" href="members.html"><i class="bi bi-people me-2"></i>Bác sĩ &amp; Bệnh nhân</a>
         <a class="nav-link rounded mb-1" href="images.html"><i class="bi bi-images me-2"></i>Ảnh võng mạc</a>
-        <a class="nav-link rounded mb-1" href="analytics.html"><i class="bi bi-graph-up me-2"></i>Phân tích</a>
+        <a class="nav-link rounded mb-1" href="upload-bulk-images.html"><i class="bi bi-cloud-upload me-2"></i>Upload hàng loạt</a>
         <a class="nav-link rounded mb-1" href="alerts.html"><i class="bi bi-exclamation-triangle me-2"></i>Cảnh báo</a>
-        <a class="nav-link rounded mb-1" href="reports.html"><i class="bi bi-file-earmark-text me-2"></i>Báo cáo</a>
+        <a class="nav-link rounded mb-1" href="reports-risk.html"><i class="bi bi-file-bar-graph me-2"></i>Báo cáo &amp; Rủi ro</a>
+        <a class="nav-link rounded mb-1" href="screening-campaign.html"><i class="bi bi-clipboard-pulse me-2"></i>Báo cáo sàng lọc</a>
         <a class="nav-link rounded mb-1 active" href="usage.html"><i class="bi bi-pie-chart me-2"></i>Sử dụng</a>
         <a class="nav-link rounded mb-1" href="export.html"><i class="bi bi-download me-2"></i>Xuất thống kê</a>
         <a class="nav-link rounded mb-1" href="subscriptions.html"><i class="bi bi-credit-card me-2"></i>Gói đăng ký</a>
@@ -55,10 +59,96 @@
 
     <main class="flex-grow-1 p-4" style="background-color: #f5f5f5;">
       <div class="container-fluid">
-        <h1 class="h3 mb-4">Sử dụng dịch vụ</h1>
+        <h1 class="h3 mb-4">Theo dõi số lượng ảnh đã phân tích và mức sử dụng gói</h1>
         <div id="pageError" class="alert alert-danger d-none"></div>
+
+        <!-- 1. Số lượng ảnh -->
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-header bg-white"><h5 class="mb-0"><i class="bi bi-images me-2"></i>Số lượng ảnh</h5></div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="p-3 bg-light rounded">
+                  <div class="text-muted small">Ảnh đã tải lên</div>
+                  <div class="stat-number" id="totalImagesUploaded">-</div>
+                  <small class="text-muted">Tổng ảnh võng mạc phòng khám đã upload</small>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="p-3 bg-light rounded">
+                  <div class="text-muted small">Ảnh đã phân tích</div>
+                  <div class="stat-number text-primary" id="totalAnalyses">-</div>
+                  <small class="text-muted">Số ảnh đã được AI phân tích</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Mức sử dụng gói -->
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-header bg-white"><h5 class="mb-0"><i class="bi bi-pie-chart me-2"></i>Mức sử dụng gói</h5></div>
+          <div class="card-body">
+            <div class="row mb-4">
+              <div class="col-md-4 mb-3">
+                <div class="text-muted small">Số lượt tải ảnh (đã cấp cho phòng khám)</div>
+                <div class="stat-number" id="totalCreditsAllocated">-</div>
+              </div>
+              <div class="col-md-4 mb-3">
+                <div class="text-muted small">Đã sử dụng</div>
+                <div class="stat-number text-warning" id="creditsUsed">-</div>
+              </div>
+              <div class="col-md-4 mb-3">
+                <div class="text-muted small">Còn lại</div>
+                <div class="stat-number text-success" id="remainingCredits">-</div>
+              </div>
+            </div>
+            <div class="row mb-4">
+              <div class="col-md-6 mb-3">
+                <div class="text-muted small">Số lượt tải ảnh mà clinic đã dùng</div>
+                <div class="stat-number" id="imagesUsedByClinic">-</div>
+              </div>
+              <div class="col-md-6 mb-3">
+                <div class="text-muted small">Số lượt tải ảnh mà bệnh nhân đã dùng</div>
+                <div class="stat-number" id="imagesUsedByPatients">-</div>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label text-muted mb-1">Tỷ lệ đã dùng</label>
+              <div class="progress usage-progress">
+                <div class="progress-bar bg-primary" id="usageProgressBar" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+              </div>
+            </div>
+            <p class="text-muted small mb-0">Mỗi ảnh tải lên = 1 lượt sử dụng gói. Gói đang kích hoạt: <strong id="activeSubsCount">0</strong>.</p>
+          </div>
+        </div>
+
+        <!-- 3. Chi tiết gói đăng ký đang dùng của clinic -->
         <div class="card border-0 shadow-sm">
-          <div class="card-body" id="usageContent">Đang tải...</div>
+          <div class="card-header bg-white">
+            <h5 class="mb-0"><i class="bi bi-credit-card me-2"></i>Chi tiết gói đăng ký đang dùng của phòng khám</h5>
+          </div>
+          <div class="card-body">
+            <div id="usageLoading" class="text-center py-4 text-muted">Đang tải...</div>
+            <div id="packageUsageTableWrap" class="d-none">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Gói dịch vụ</th>
+                      <th>Số lượt tải ảnh</th>
+                      <th>Đã sử dụng</th>
+                      <th>Còn lại</th>
+                      <th>Hiệu lực</th>
+                    </tr>
+                  </thead>
+                  <tbody id="packageUsageTbody"></tbody>
+                </table>
+              </div>
+              <p class="text-muted small mt-2 mb-0" id="packageUsageSummary"></p>
+            </div>
+            <div id="usageEmpty" class="text-muted text-center py-4 d-none">Chưa có gói đăng ký đang kích hoạt. <a href="subscriptions.html">Xem gói đăng ký</a>.</div>
+          </div>
         </div>
       </div>
     </main>

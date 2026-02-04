@@ -12,6 +12,7 @@ from services.service_package_service import ServicePackageService
 from services.payment_service import PaymentService
 from api.responses import success_response, error_response, not_found_response, validation_error_response
 from api.schemas import SubscriptionCreateRequestSchema, SubscriptionUpdateRequestSchema, SubscriptionResponseSchema
+from domain.exceptions import NotFoundException
 from datetime import datetime, timedelta, date
 
 subscription_bp = Blueprint('subscription', __name__, url_prefix='/api/subscriptions')
@@ -45,6 +46,8 @@ def health_check():
 
 # FR-11: Patient mua gói demo (PTT chuyển khoản) - package_id 1-5
 PATIENT_PACKAGE_IDS = [1, 2, 3, 4, 5]
+# FR-28: Gói dịch vụ cấp phòng khám - package_id 6-8
+CLINIC_PACKAGE_IDS = [6, 7, 8]
 
 
 @subscription_bp.route('/purchase-demo', methods=['POST'])
@@ -104,6 +107,68 @@ def purchase_package_demo():
             },
             'remaining_credits': total_remaining,
         }, 'Mua gói thành công (demo PTT chuyển khoản).', 201)
+    except ValueError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        return error_response(f'Internal server error: {str(e)}', 500)
+
+
+# FR-28: Clinic mua gói dịch vụ cấp phòng khám (package_id 6-8)
+@subscription_bp.route('/purchase-clinic-demo', methods=['POST'])
+@require_roles(['ClinicManager', 'Admin'])
+def purchase_clinic_package_demo():
+    """
+    Mua gói dịch vụ cấp phòng khám (FR-28): tạo subscription + payment demo.
+    Chỉ cho phép package_id 6, 7, 8.
+    """
+    try:
+        data = request.get_json() or {}
+        account_id = data.get('account_id')
+        package_id = data.get('package_id')
+        if account_id is None or package_id is None:
+            return error_response('account_id and package_id are required', 400)
+        account_id = int(account_id)
+        package_id = int(package_id)
+        if package_id not in CLINIC_PACKAGE_IDS:
+            return error_response('Chỉ được chọn gói cấp phòng khám (id 6, 7 hoặc 8)', 400)
+        account = account_service.get_account_by_id(account_id)
+        if not account:
+            return not_found_response('Account not found')
+        package = package_service.get_package_by_id(package_id)
+        if not package:
+            return not_found_response('Service package not found')
+        remaining_credits = package.image_limit or 0
+        start_date = date.today()
+        end_date = start_date + timedelta(days=package.duration_days)
+        subscription = subscription_service.create_subscription(
+            account_id=account_id,
+            package_id=package_id,
+            start_date=start_date,
+            end_date=end_date,
+            remaining_credits=remaining_credits,
+            status='active'
+        )
+        if not subscription:
+            return error_response('Failed to create subscription', 500)
+        amount = float(package.price)
+        payment = payment_service.create_payment(
+            subscription_id=subscription.subscription_id,
+            amount=amount,
+            payment_method='bank_transfer',
+            status='completed'
+        )
+        total_remaining = subscription_service.get_remaining_credits(account_id)
+        return success_response({
+            'subscription': SubscriptionResponseSchema().dump(subscription),
+            'payment': {
+                'payment_id': payment.payment_id,
+                'subscription_id': payment.subscription_id,
+                'amount': float(payment.amount),
+                'payment_method': payment.payment_method,
+                'status': payment.status,
+            },
+            'remaining_credits': total_remaining,
+        }, 'Mua gói cấp phòng khám thành công (demo).', 201)
     except ValueError as e:
         return error_response(str(e), 400)
     except Exception as e:
@@ -256,6 +321,9 @@ def get_subscription(subscription_id):
         return error_response(f'Internal server error: {str(e)}', 500)
 
 
+CLINIC_PACKAGE_IDS = (6, 7, 8)
+
+
 @subscription_bp.route('/account/<int:account_id>', methods=['GET'])
 @require_roles(['Patient', 'Doctor', 'Admin', 'ClinicManager'])
 def get_subscriptions_by_account(account_id):
@@ -278,13 +346,29 @@ def get_subscriptions_by_account(account_id):
     """
     try:
         subscriptions = subscription_service.get_subscriptions_by_account(account_id)
-        
+        data = SubscriptionResponseSchema(many=True).dump(subscriptions)
+
+        # Gói cấp phòng khám (6-8): Credits còn lại = Credits ban đầu - Đã sử dụng (upload clinic + patient)
+        account = account_service.get_account_by_id(account_id)
+        if account and getattr(account, 'clinic_id', None):
+            from api.controllers.clinic_controller import clinic_service
+            usage = clinic_service.get_clinic_usage_summary(account.clinic_id)
+            credits_used = usage.get('credits_used', 0)
+            for i, sub in enumerate(subscriptions):
+                if sub.package_id in CLINIC_PACKAGE_IDS:
+                    pkg = package_service.get_package_by_id(sub.package_id)
+                    image_limit = getattr(pkg, 'image_limit', 0) or 0 if pkg else 0
+                    payments = payment_repo.get_by_subscription(sub.subscription_id)
+                    num_payments = len(payments) if payments else 1
+                    initial = num_payments * image_limit
+                    data[i]['remaining_credits'] = max(0, initial - credits_used)
+
         return success_response({
             'account_id': account_id,
             'count': len(subscriptions),
-            'subscriptions': SubscriptionResponseSchema(many=True).dump(subscriptions)
+            'subscriptions': data
         })
-        
+
     except Exception as e:
         return error_response(f'Internal server error: {str(e)}', 500)
 
@@ -708,28 +792,50 @@ def renew_subscription(subscription_id):
         description: Subscription not found
     """
     try:
-        data = request.get_json()
-        
-        required_fields = ['duration_days', 'additional_credits']
-        missing_fields = [field for field in required_fields if not data.get(field)]
-        if missing_fields:
-            return validation_error_response({'message': f'Missing required fields: {", ".join(missing_fields)}'})
-        
+        data = request.get_json() or {}
+        duration_days = data.get('duration_days')
+        additional_credits = data.get('additional_credits', 0)
+        if duration_days is None:
+            return error_response('duration_days is required', 400)
+        duration_days = int(duration_days)
+        additional_credits = int(additional_credits) if additional_credits is not None else 0
+        if duration_days <= 0:
+            return error_response('duration_days must be positive', 400)
+        subscription = subscription_service.get_subscription_by_id(subscription_id)
+        base_date = subscription.end_date if subscription.end_date else date.today()
+        if base_date < date.today():
+            base_date = date.today()
+        new_end_date = base_date + timedelta(days=duration_days)
         subscription = subscription_service.renew_subscription(
             subscription_id,
-            data['duration_days'],
-            data['additional_credits']
+            new_end_date,
+            additional_credits
         )
         if not subscription:
             return not_found_response('Subscription not found')
-        
+        # Tạo payment khi gia hạn (giống mua gói mới)
+        package = package_service.get_package_by_id(subscription.package_id)
+        amount = float(package.price) if package and package.price is not None else 0
+        payment = payment_service.create_payment(
+            subscription_id=subscription.subscription_id,
+            amount=amount,
+            payment_method='bank_transfer',
+            status='completed'
+        )
+        total_remaining = subscription_service.get_remaining_credits(subscription.account_id)
         return success_response({
-            'subscription_id': subscription.subscription_id,
-            'end_date': subscription.end_date.isoformat() if subscription.end_date else None,
-            'remaining_credits': subscription.remaining_credits,
-            'status': subscription.status
-        }, 'Subscription renewed successfully')
-        
+            'subscription': SubscriptionResponseSchema().dump(subscription),
+            'payment': {
+                'payment_id': payment.payment_id,
+                'subscription_id': payment.subscription_id,
+                'amount': float(payment.amount),
+                'payment_method': payment.payment_method,
+                'status': payment.status,
+            },
+            'remaining_credits': total_remaining,
+        }, 'Gia hạn gói thành công.')
+    except NotFoundException:
+        return not_found_response('Subscription not found')
     except ValueError as e:
         return error_response(str(e), 400)
     except Exception as e:
