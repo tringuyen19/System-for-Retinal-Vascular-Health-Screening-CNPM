@@ -69,7 +69,26 @@ class AiResultService:
         if risk_level.lower() in ['high', 'critical'] and self.notification_repository:
             self._send_high_risk_alert(result)
         
+        # Auto-trigger: Tạo AI annotation khi đã có AI result (1:1 theo analysis_id)
+        self._auto_create_ai_annotation(analysis_id)
+        
         return result
+    
+    def _auto_create_ai_annotation(self, analysis_id: int):
+        """
+        Tự tạo AI annotation khi đã chạy xong AI result (cùng analysis_id).
+        Dùng heatmap_url rỗng/placeholder, có thể cập nhật sau khi có heatmap thật.
+        """
+        try:
+            from infrastructure.repositories.ai_annotation_repository import AiAnnotationRepository
+            from infrastructure.databases.mssql import session
+            annotation_repo = AiAnnotationRepository(session)
+            existing = annotation_repo.get_by_analysis_id(analysis_id)
+            if not existing:
+                annotation_repo.add(analysis_id=analysis_id, heatmap_url='', description=None)
+        except Exception as e:
+            # Log nhưng không làm fail luồng tạo result
+            print(f"Warning: auto-create AI annotation failed for analysis_id={analysis_id}: {e}")
     
     def _send_ai_result_ready_notification(self, result: AiResult):
         """

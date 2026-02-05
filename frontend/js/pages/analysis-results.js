@@ -70,10 +70,14 @@
       }
       listEl.innerHTML = 'Đang tải chỉ số...';
       var promises = analyses.map(function (a) {
-        return window.AuraAPI.getResultsByAnalysis(a.analysis_id).then(function (res) {
-          return { analysis: a, results: (res && res.results) || [] };
-        }).catch(function () {
-          return { analysis: a, results: [] };
+        var resultsPromise = window.AuraAPI.getResultsByAnalysis(a.analysis_id).then(function (res) {
+          return (res && res.results) || [];
+        }).catch(function () { return []; });
+        var annotationPromise = window.AuraAPI.getAnnotationByAnalysis(a.analysis_id).then(function (res) {
+          return (res && (res.heatmap_url !== undefined || res.annotation_id !== undefined)) ? res : null;
+        }).catch(function () { return null; });
+        return Promise.all([resultsPromise, annotationPromise]).then(function (arr) {
+          return { analysis: a, results: arr[0], annotation: arr[1] };
         });
       });
       return Promise.all(promises).then(function (items) {
@@ -81,6 +85,8 @@
         listEl.innerHTML = items.map(function (item) {
           var a = item.analysis;
           var results = item.results;
+          var annotation = item.annotation;
+          var heatmapUrl = (annotation && annotation.heatmap_url) ? (annotation.heatmap_url + '').trim() : '';
           var dateStr = formatDate(a.analysis_time);
           var status = statusLabel(a.status);
           var statusClass = a.status === 'completed' ? 'success' : a.status === 'failed' ? 'danger' : 'secondary';
@@ -106,6 +112,37 @@
           } else {
             resultsHtml = '<div class="aura-analysis-metrics mt-3"><p class="small text-muted mb-0">Chưa có chỉ số chi tiết.</p></div>';
           }
+          var annotationHtml = '';
+          var modalId = 'aura-annotation-modal-' + (a.analysis_id || '');
+          annotationHtml =
+            '<div class="aura-annotation-section mt-3 rounded border bg-light">' +
+            '<div class="aura-metrics-title px-2 pt-2"><i class="bi bi-image-fill me-1"></i>Ảnh chú thích AI (heatmap)</div>';
+          if (heatmapUrl) {
+            var safeUrl = heatmapUrl.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            annotationHtml +=
+              '<div class="px-2 pb-2">' +
+              '<a href="' + safeUrl + '" target="_blank" rel="noopener" class="d-block rounded overflow-hidden border bg-white mt-2" style="max-height: 160px;">' +
+              '<img src="' + safeUrl + '" alt="Chú thích AI" class="img-fluid w-100" style="object-fit: contain; max-height: 160px;" loading="lazy">' +
+              '</a>' +
+              '<button type="button" class="btn btn-outline-primary btn-sm mt-2 w-100" data-bs-toggle="modal" data-bs-target="#' + modalId + '">' +
+              '<i class="bi bi-zoom-in me-1"></i>Xem phóng to' +
+              '</button>' +
+              '</div>';
+            annotationHtml +=
+              '<div class="modal fade" id="' + modalId + '" tabindex="-1">' +
+              '<div class="modal-dialog modal-lg modal-dialog-centered">' +
+              '<div class="modal-content"><div class="modal-header"><h6 class="modal-title">Ảnh chú thích AI – Phân tích ' + (a.analysis_id || '') + '</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
+              '<div class="modal-body text-center p-0">' +
+              '<img src="' + safeUrl + '" alt="Chú thích AI" class="img-fluid" style="max-width: 100%;">' +
+              '</div></div></div></div>';
+          } else {
+            annotationHtml +=
+              '<div class="px-2 pb-3 pt-1 text-center">' +
+              '<i class="bi bi-image text-muted" style="font-size: 2rem;"></i>' +
+              '<p class="small text-muted mb-0 mt-2">Chưa có ảnh heatmap. Ảnh chú thích sẽ hiển thị tại đây khi có dữ liệu.</p>' +
+              '</div>';
+          }
+          annotationHtml += '</div>';
           return (
             '<div class="col-md-6 col-lg-4">' +
             '<div class="card aura-analysis-card border-0 shadow-sm h-100">' +
@@ -117,6 +154,7 @@
             '<p class="card-text small text-muted mb-0"><i class="bi bi-image me-1"></i>Ảnh ' + (a.image_id || '-') + '</p>' +
             '<p class="card-text small text-muted mb-0"><i class="bi bi-clock me-1"></i>' + dateStr + '</p>' +
             resultsHtml +
+            annotationHtml +
             '<a href="reports.html" class="btn btn-outline-primary btn-sm mt-3 w-100"><i class="bi bi-file-earmark-text me-1"></i>Xem báo cáo</a>' +
             '</div></div></div>'
           );
