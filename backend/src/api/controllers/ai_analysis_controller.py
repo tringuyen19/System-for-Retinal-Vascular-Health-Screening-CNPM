@@ -12,6 +12,8 @@ from services.notification_service import NotificationService
 from api.responses import success_response, error_response, not_found_response, validation_error_response
 from api.schemas import AiAnalysisCreateRequestSchema, AiAnalysisUpdateRequestSchema, AiAnalysisResponseSchema
 from domain.exceptions import NotFoundException, ValidationException
+from config import Config
+from decimal import Decimal
 
 ai_analysis_bp = Blueprint('ai_analysis', __name__, url_prefix='/api/ai-analysis')
 
@@ -25,6 +27,108 @@ notification_repo = NotificationRepository(session)
 analysis_service = AiAnalysisService(analysis_repo)
 image_service = RetinalImageService(image_repo)
 notification_service = NotificationService(notification_repo)
+
+
+def _check_kaggle_secret():
+    """Xác thực header X-Kaggle-Secret cho endpoint submit-kaggle-result."""
+    secret = request.headers.get('X-Kaggle-Secret') or request.headers.get('Authorization')
+    if secret and secret.startswith('Bearer '):
+        secret = secret[7:]
+    expected = getattr(Config, 'KAGGLE_WEBHOOK_SECRET', '') or 'change-me-in-production'
+    if not expected or secret != expected:
+        return False
+    return True
+
+
+@ai_analysis_bp.route('/submit-kaggle-result', methods=['POST'])
+def submit_kaggle_result():
+    """
+    Nhận kết quả AI từ Kaggle notebook (Cách 2). Không dùng JWT; dùng header X-Kaggle-Secret.
+    Body JSON: image_id, disease_type, risk_level, confidence_score [, processing_time, vessel_mask_url, heatmap_url]
+    """
+    if not _check_kaggle_secret():
+        return error_response('Unauthorized: X-Kaggle-Secret không đúng.', 401)
+    try:
+        data = request.get_json() or {}
+        image_id = data.get('image_id')
+        disease_type = data.get('disease_type') or 'diabetic_retinopathy'
+        risk_level = (data.get('risk_level') or 'medium').lower()
+        confidence_score = data.get('confidence_score', 0.0)
+        processing_time = data.get('processing_time', type=int) if data.get('processing_time') is not None else None
+        if image_id is None:
+            return error_response('Thiếu image_id.', 400)
+        for level in ('low', 'medium', 'high', 'critical'):
+            if risk_level == level:
+                break
+        else:
+            return error_response('risk_level phải là low, medium, high hoặc critical.', 400)
+        try:
+            confidence_score = Decimal(str(float(confidence_score)))
+        except (TypeError, ValueError):
+            return error_response('confidence_score phải là số 0-100.', 400)
+        if confidence_score < 0 or confidence_score > 100:
+            return error_response('confidence_score phải từ 0 đến 100.', 400)
+
+        analysis = analysis_service.get_analysis_by_image(image_id)
+        if not analysis:
+            active_model = None
+            try:
+                from services.ai_model_version_service import AiModelVersionService
+                from infrastructure.repositories.ai_model_version_repository import AiModelVersionRepository
+                mv_repo = AiModelVersionRepository(session)
+                mv_svc = AiModelVersionService(mv_repo)
+                active_model = mv_svc.get_active_model()
+            except Exception:
+                pass
+            if not active_model:
+                return not_found_response('Không tìm thấy analysis cho image_id này và không có active model để tạo mới.')
+            image = image_service.get_image_by_id(image_id)
+            if not image:
+                return not_found_response('Image not found')
+            analysis = analysis_service.create_analysis(
+                image_id=image_id,
+                ai_model_version_id=active_model.ai_model_version_id,
+                status='pending',
+                processing_time=None
+            )
+        if analysis.status == 'completed':
+            return success_response({
+                'analysis_id': analysis.analysis_id,
+                'image_id': image_id,
+                'message': 'Analysis đã completed; kết quả đã tồn tại.'
+            }, 'OK', 200)
+
+        analysis_service.mark_as_completed(analysis.analysis_id, processing_time or 0)
+        from infrastructure.repositories.ai_result_repository import AiResultRepository
+        from services.ai_result_service import AiResultService
+        result_repo = AiResultRepository(session)
+        result_svc = AiResultService(
+            repository=result_repo,
+            notification_repository=notification_repo,
+            analysis_repository=analysis_repo,
+            image_repository=image_repo
+        )
+        result_svc.create_result(
+            analysis_id=analysis.analysis_id,
+            disease_type=disease_type[:100],
+            risk_level=risk_level,
+            confidence_score=confidence_score
+        )
+        try:
+            image_service.mark_as_analyzed(image_id)
+        except Exception:
+            pass
+        return success_response({
+            'analysis_id': analysis.analysis_id,
+            'image_id': image_id,
+            'message': 'Đã lưu kết quả từ Kaggle.'
+        }, 'Kết quả Kaggle đã lưu.', 201)
+    except ValidationException as e:
+        return error_response(str(e), 400)
+    except NotFoundException as e:
+        return error_response(str(e), 404)
+    except Exception as e:
+        return error_response(f'Lỗi: {str(e)}', 500)
 
 
 @ai_analysis_bp.route('/health', methods=['GET'])

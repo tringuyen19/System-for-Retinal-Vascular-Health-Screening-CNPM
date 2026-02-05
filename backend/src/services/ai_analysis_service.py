@@ -120,8 +120,8 @@ class AiAnalysisService:
             processing_time=processing_time
         )
         
-        # Auto-trigger: Create AI result with mock data when analysis is created
-        if analysis and analysis.analysis_id:
+        # Chỉ tạo AI result (mock) khi status='completed'. Khi dùng Kaggle (pending) sẽ nhận kết quả qua submit-kaggle-result.
+        if analysis and analysis.analysis_id and status == 'completed':
             self._auto_create_result(analysis.analysis_id)
         
         return analysis

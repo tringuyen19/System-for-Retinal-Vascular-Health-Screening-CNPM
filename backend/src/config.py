@@ -25,6 +25,13 @@ class Config:
     # Frontend base URL để redirect sau khi login Google xong
     FRONTEND_BASE_URL = os.environ.get('FRONTEND_BASE_URL') or 'http://localhost:8080'
 
+    # Cách 2: Kaggle + Cloudinary – AI result từ Kaggle notebook gửi về
+    AI_RESULT_SOURCE = os.environ.get('AI_RESULT_SOURCE') or ''  # 'kaggle' = tạo analysis pending, chờ submit-kaggle-result
+    CLOUDINARY_CLOUD_NAME = os.environ.get('CLOUDINARY_CLOUD_NAME') or ''
+    CLOUDINARY_API_KEY = os.environ.get('CLOUDINARY_API_KEY') or ''
+    CLOUDINARY_API_SECRET = os.environ.get('CLOUDINARY_API_SECRET') or ''
+    KAGGLE_WEBHOOK_SECRET = os.environ.get('KAGGLE_WEBHOOK_SECRET') or 'change-me-in-production'
+
 class DevelopmentConfig(Config):
     """Development configuration."""
     DEBUG = True

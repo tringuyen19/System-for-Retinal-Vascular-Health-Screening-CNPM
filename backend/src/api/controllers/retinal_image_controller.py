@@ -18,6 +18,7 @@ from services.ai_model_version_service import AiModelVersionService
 from api.responses import success_response, error_response, not_found_response, validation_error_response
 from api.schemas import RetinalImageCreateRequestSchema, RetinalImageUpdateRequestSchema, RetinalImageResponseSchema, RetinalImageBulkCreateRequestSchema
 from domain.exceptions import BusinessRuleException
+from config import Config
 
 retinal_image_bp = Blueprint('retinal_image', __name__, url_prefix='/api/retinal-images')
 
@@ -157,24 +158,30 @@ def upload_image():
             status=data.get('status', 'uploaded')
         )
         
-        # Auto-trigger AI analysis if active model exists
+        # Auto-trigger AI analysis: Cách 2 (Kaggle) = pending chờ submit-kaggle-result; mặc định = completed + mock
         analysis_id = None
         try:
             active_model = model_version_service.get_active_model()
             if active_model:
-                # Generate random processing time (1-20 seconds)
-                processing_time = random.randint(1, 20)
-                analysis = analysis_service.create_analysis(
-                    image_id=image.image_id,
-                    ai_model_version_id=active_model.ai_model_version_id,
-                    status='completed',
-                    processing_time=processing_time
-                )
+                use_kaggle = getattr(Config, 'AI_RESULT_SOURCE', '') == 'kaggle'
+                if use_kaggle:
+                    analysis = analysis_service.create_analysis(
+                        image_id=image.image_id,
+                        ai_model_version_id=active_model.ai_model_version_id,
+                        status='pending',
+                        processing_time=None
+                    )
+                else:
+                    processing_time = random.randint(1, 20)
+                    analysis = analysis_service.create_analysis(
+                        image_id=image.image_id,
+                        ai_model_version_id=active_model.ai_model_version_id,
+                        status='completed',
+                        processing_time=processing_time
+                    )
                 if analysis:
                     analysis_id = analysis.analysis_id
         except Exception as e:
-            # Log analysis error but don't fail the upload
-            # Analysis can be created manually later if needed
             pass
         
         # Serialize response with schema
@@ -191,6 +198,90 @@ def upload_image():
         return error_response(str(e), 400)
     except Exception as e:
         return error_response(f'Internal server error: {str(e)}', 500)
+
+
+@retinal_image_bp.route('/upload-for-ai', methods=['POST'])
+@require_roles(['Patient', 'Doctor', 'Admin', 'ClinicManager'])
+def upload_for_ai():
+    """
+    Upload ảnh võng mạc (file) lên Cloudinary và tạo bản ghi + AI analysis pending (Cách 2: Kaggle).
+    Multipart: file, patient_id, clinic_id, uploaded_by, image_type, eye_side.
+    Trả về image_url (Cloudinary) để dùng trong Kaggle notebook.
+    """
+    try:
+        if 'file' not in request.files:
+            return error_response('Thiếu file. Gửi multipart/form-data với field "file".', 400)
+        f = request.files['file']
+        if not f or not f.filename:
+            return error_response('File trống.', 400)
+        patient_id = request.form.get('patient_id', type=int)
+        clinic_id = request.form.get('clinic_id', type=int)
+        uploaded_by = request.form.get('uploaded_by', type=int)
+        image_type = (request.form.get('image_type') or 'fundus').strip().lower()
+        eye_side = (request.form.get('eye_side') or 'left').strip().lower()
+        if not all([patient_id, clinic_id, uploaded_by]):
+            return error_response('Thiếu patient_id, clinic_id hoặc uploaded_by.', 400)
+        if image_type not in ('fundus', 'oct', 'fluorescein'):
+            return error_response('image_type phải là fundus, oct hoặc fluorescein.', 400)
+        if eye_side not in ('left', 'right', 'both'):
+            return error_response('eye_side phải là left, right hoặc both.', 400)
+
+        patient = patient_service.get_patient_by_id(patient_id)
+        if not patient:
+            return not_found_response('Patient not found')
+        clinic = clinic_service.get_clinic_by_id(clinic_id)
+        if not clinic:
+            return not_found_response('Clinic not found')
+        if subscription_service.get_remaining_credits(uploaded_by) < 1:
+            return error_response('Hết lượt phân tích. Vui lòng mua thêm gói.', 402)
+        try:
+            subscription_service.deduct_credit_for_account(uploaded_by, 1)
+        except BusinessRuleException as e:
+            return error_response(str(e) or 'Hết lượt phân tích.', 402)
+
+        from infrastructure.services.cloudinary_service import upload_image as cloudinary_upload, is_cloudinary_configured
+        if not is_cloudinary_configured():
+            return error_response('Cloudinary chưa cấu hình. Đặt CLOUDINARY_* trong .env.', 503)
+        cloudinary_url = cloudinary_upload(f, folder='retina_input')
+
+        image = image_service.upload_image(
+            patient_id=patient_id,
+            clinic_id=clinic_id,
+            uploaded_by=uploaded_by,
+            image_type=image_type,
+            eye_side=eye_side,
+            image_url=cloudinary_url,
+            status='uploaded'
+        )
+
+        analysis_id = None
+        try:
+            active_model = model_version_service.get_active_model()
+            if active_model:
+                use_kaggle = getattr(Config, 'AI_RESULT_SOURCE', '') == 'kaggle'
+                status = 'pending' if use_kaggle else 'completed'
+                processing_time = None if use_kaggle else random.randint(1, 20)
+                analysis = analysis_service.create_analysis(
+                    image_id=image.image_id,
+                    ai_model_version_id=active_model.ai_model_version_id,
+                    status=status,
+                    processing_time=processing_time
+                )
+                if analysis:
+                    analysis_id = analysis.analysis_id
+        except Exception:
+            pass
+
+        return success_response({
+            'image_id': image.image_id,
+            'analysis_id': analysis_id,
+            'image_url': cloudinary_url,
+            'message': 'Upload lên Cloudinary thành công. Dùng image_url trong Kaggle notebook, sau đó gọi submit-kaggle-result.'
+        }, 'Upload for AI (Kaggle) thành công', 201)
+    except ValueError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        return error_response(f'Lỗi: {str(e)}', 500)
 
 
 @retinal_image_bp.route('/bulk', methods=['POST'])

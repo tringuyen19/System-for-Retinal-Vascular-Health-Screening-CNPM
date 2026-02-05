@@ -58,8 +58,10 @@ System for Retinal Vascular Health Screening/
 │   └── patient/                      # Trang bệnh nhân (dashboard, upload ảnh, kết quả, ...)
 │
 ├── docs/
-│   ├── README.md                     
-│   └── 
+│   ├── README.md                     # File này
+│   ├── AI_SETUP_GUIDE.md             # Hướng dẫn AI (Cách 2: Kaggle + Cloudinary)
+│   └── flask-clean-architecture.md
+├── aimodels/                         # AI: vessel, DR, Cloudinary (xem docs/AI_SETUP_GUIDE.md)
 │
 ├── .gitignore
 └── default.db                       
