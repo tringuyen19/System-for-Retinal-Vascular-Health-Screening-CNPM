@@ -35,8 +35,18 @@
   /* Other */
   --aura-radius: 4px;
   --aura-radius-lg: 8px;
+  --aura-radius-xl: 12px;
+  --aura-radius-2xl: 16px;
   --aura-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   --aura-shadow-hover: 0 4px 8px rgba(0, 0, 0, 0.15);
+  --aura-shadow-card: 0 4px 20px rgba(0, 0, 0, 0.08);
+  --aura-shadow-card-hover: 0 12px 40px rgba(25, 118, 210, 0.15);
+  /* Homepage */
+  --aura-home-gradient: linear-gradient(135deg, #0d47a1 0%, #1565c0 50%, #1976d2 100%);
+  --aura-home-bg: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  --aura-home-card-upload: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+  --aura-home-card-results: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+  --aura-home-card-guide: linear-gradient(135deg, #e1f5fe 0%, #b3e5fc 100%);
 }
 
 /* ========== Global styles ========== */
@@ -48,7 +58,7 @@
 
 body {
   margin: 0;
-  font-family: "Roboto", system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-family: "Plus Jakarta Sans", "Roboto", system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   font-size: 1rem;
   line-height: 1.5;
   color: var(--aura-text-primary);
@@ -189,4 +199,188 @@ main.aura-main { min-height: calc(100vh - 56px); }
 }
 .aura-risk-badge.bg-warning {
   color: #212529;
+}
+
+/* ========== Homepage (index.html) ========== */
+.aura-home .aura-body-offset {
+  padding-top: 56px;
+  min-height: calc(100vh - 56px);
+}
+
+.aura-header-home {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%) !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+}
+
+.aura-sidebar-home {
+  width: 250px;
+  min-height: calc(100vh - 56px);
+  background: #fff !important;
+  border-right: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.04);
+}
+
+.aura-sidebar-home .nav-link {
+  color: #374151;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.aura-sidebar-home .nav-link:hover {
+  background: #f1f5f9;
+  color: var(--aura-primary);
+}
+
+.aura-sidebar-home .nav-link.active {
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+  color: #0d47a1;
+  font-weight: 600;
+}
+
+.aura-sidebar-home .text-muted {
+  color: #64748b !important;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.aura-main-home {
+  background: var(--aura-home-bg);
+  padding: 0;
+  min-height: calc(100vh - 56px);
+}
+
+.aura-home-hero {
+  position: relative;
+  padding: 2.5rem 1.5rem 2rem;
+  overflow: hidden;
+}
+
+.aura-home-hero-bg {
+  position: absolute;
+  inset: 0;
+  background: var(--aura-home-gradient);
+  opacity: 0.97;
+}
+
+.aura-home-hero-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.06'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  opacity: 0.5;
+}
+
+.aura-home-hero .container-fluid {
+  position: relative;
+  z-index: 1;
+}
+
+.aura-home-title {
+  font-size: clamp(1.35rem, 4vw, 1.75rem);
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+.aura-home-brand {
+  color: #fff;
+  background: linear-gradient(90deg, #fff 0%, #e0e7ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 800;
+}
+
+@supports not (background-clip: text) {
+  .aura-home-brand { -webkit-text-fill-color: inherit; }
+}
+
+.aura-home-subtitle {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+  max-width: 480px;
+  line-height: 1.5;
+}
+
+.aura-home-content {
+  padding: 2rem 1.5rem 3rem;
+}
+
+.aura-home-card {
+  display: block;
+  background: #fff;
+  border-radius: var(--aura-radius-2xl);
+  padding: 1.75rem;
+  height: 100%;
+  min-height: 220px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: var(--aura-shadow-card);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.aura-home-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--aura-shadow-card-hover);
+  border-color: rgba(25, 118, 210, 0.2);
+}
+
+.aura-home-card-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--aura-radius-xl);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.aura-home-card-upload .aura-home-card-icon {
+  background: var(--aura-home-card-upload);
+  color: #1565c0;
+}
+
+.aura-home-card-results .aura-home-card-icon {
+  background: var(--aura-home-card-results);
+  color: #2e7d32;
+}
+
+.aura-home-card-guide .aura-home-card-icon {
+  background: var(--aura-home-card-guide);
+  color: #0288d1;
+}
+
+.aura-home-card-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--aura-text-primary);
+  margin: 0 0 0.5rem 0;
+}
+
+.aura-home-card-desc {
+  font-size: 0.9rem;
+  color: var(--aura-text-secondary);
+  margin: 0 0 1rem 0;
+  line-height: 1.5;
+}
+
+.aura-home-card-cta {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--aura-primary);
+  display: inline-flex;
+  align-items: center;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.aura-home-card:hover .aura-home-card-cta {
+  color: var(--aura-primary-dark);
+  transform: translateX(4px);
+}
+
+.aura-footer-home {
+  background: #fff !important;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
